@@ -83,45 +83,52 @@ def profile_pipeline(method:str):
     pipe_args = get_pipeline_args()
     
     profile_result = {}
-
+    # torch.cuda.reset_peak_memory_stats() 
     audio_sampler = AudioSampler(pipe_args)
     noise_reduction = NoiseReduction(pipe_args)
     wave_to_text = WaveToText(pipe_args)
+    
     decoder = Decoder(pipe_args)
 
 
     print(f"Start {method} profile args: {pipe_args}")
     start_time = time.time()
 
-    # print('profile latency & input size')
-    # # Profile args:
-    # num_profile_sample_latency  = 10 #Can't be small because of warm-up
+    print('profile latency & input size')
+    # Profile args:
+    num_profile_sample_latency  = 10 #Can't be small because of warm-up
+    
+    for _ in tqdm.tqdm(range(num_profile_sample_latency)):
+        audio, sr, transcript = random_load_speech_data()
+        batch_data = {
+            'audio': torch.tensor(np.expand_dims(audio, axis=0)),
+            'sr': sr,
+            'transcript': transcript
+        }
 
-    # for _ in tqdm.tqdm(range(num_profile_sample_latency)):
-    #     audio, sr, transcript = random_load_speech_data()
-    #     batch_data = {
-    #         'audio': torch.tensor(np.expand_dims(audio, axis=0)),
-    #         'sr': sr,
-    #         'transcript': transcript
-    #     }
+        batch_data = audio_sampler.profile(batch_data, profile_compute_latency=True, profile_input_size=True)
+        batch_data = noise_reduction.profile(batch_data, profile_compute_latency=True, profile_input_size=True)
+        batch_data = wave_to_text.profile(batch_data, profile_compute_latency=True, profile_input_size=True)
+        # Reset peak memory stats
 
-    #     batch_data = audio_sampler.profile(batch_data, profile_compute_latency=True, profile_input_size=True)
-    #     batch_data = noise_reduction.profile(batch_data, profile_compute_latency=True, profile_input_size=True)
-    #     batch_data = wave_to_text.profile(batch_data, profile_compute_latency=True, profile_input_size=True)
-    #     batch_data = decoder.profile(batch_data, profile_compute_latency=True, profile_input_size=True)
-
-    # profile_result['audio_sampler_input_size'] = audio_sampler.get_input_size()
-    # profile_result['noise_reduction_input_size'] = noise_reduction.get_input_size()
-    # profile_result['wave_to_text_input_size'] = wave_to_text.get_input_size()
-    # profile_result['decoder_input_size'] = decoder.get_input_size()
-    # profile_result['audio_sampler_compute_latency'] = audio_sampler.get_compute_latency()
-    # profile_result['noise_reduction_compute_latency'] = noise_reduction.get_compute_latency()
-    # profile_result['wave_to_text_compute_latency'] = wave_to_text.get_compute_latency()
-    # profile_result['decoder_compute_latency'] = decoder.get_compute_latency()
+        batch_data = decoder.profile(batch_data, profile_compute_latency=True, profile_input_size=True)
+    max_memory_allocated = torch.cuda.max_memory_allocated()
+    max_memory_reserved = torch.cuda.max_memory_reserved()
+    # print(f"Maximum memory allocated: {max_memory_allocated / 1024 ** 2} MB")
+    # print(f"Maximum memory reserved: {max_memory_reserved / 1024 ** 2} MB")
+    # exit(0)
+    profile_result['audio_sampler_input_size'] = audio_sampler.get_input_size()
+    profile_result['noise_reduction_input_size'] = noise_reduction.get_input_size()
+    profile_result['wave_to_text_input_size'] = wave_to_text.get_input_size()
+    profile_result['decoder_input_size'] = decoder.get_input_size()
+    profile_result['audio_sampler_compute_latency'] = audio_sampler.get_compute_latency()
+    profile_result['noise_reduction_compute_latency'] = noise_reduction.get_compute_latency()
+    profile_result['wave_to_text_compute_latency'] = wave_to_text.get_compute_latency()
+    profile_result['decoder_compute_latency'] = decoder.get_compute_latency()
     
 
     print('profile accuracy')
-    num_profile_sample = 6400
+    num_profile_sample = 10 
     batch_size = 1 # calculate cummulated accuracy every batch
 
     group_accuracy = [[] for i in range(16)]
@@ -146,12 +153,6 @@ def profile_pipeline(method:str):
         sampler.feedback((filename, decoder.get_last_accuracy()))
         group_accuracy[i % 16].append(decoder.get_last_accuracy())
 
-    # print("Group result:")
-    # for i in range(16):
-    #     print(f"Group {i}: {np.mean(group_accuracy[i]):4f} {np.std(group_accuracy[i]):4f} {np.max(group_accuracy[i]):4f} {np.min(group_accuracy[i]):4f} ")
-    
-    profile_result["group_acc"] = [np.mean(group_accuracy[i]) for i in range(16)]
-    profile_result["group_std"] = [np.std(group_accuracy[i]) for i in range(16)]
     profile_result['accuracy'] = decoder.get_endpoint_accuracy()
     profile_result['cummulative_accuracy'] = cum_accuracy 
     profile_result['total_profile_time'] = time.time() - start_time
@@ -360,6 +361,7 @@ def start_prepare():
                 os.environ["model"] = str(model)
                 print(f"Prepare {audio_sr} {freq_mask} {model}")
                 profile_pipeline_normal("random")
+                torch.cuda.empty_cache()
 
 def start_exp(result_fname, method, num):
     if method not in ["bootstrap", "stratified", "random"]:
