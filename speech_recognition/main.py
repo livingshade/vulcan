@@ -8,7 +8,7 @@ import tqdm
 import pandas as pd
 import numpy as np
 from op import AudioSampler, NoiseReduction, WaveToText, Decoder
-from sampler import VOiCERandomSampler, VOiCEBootstrapSampler
+from sampler import VOiCERandomSampler, VOiCEBootstrapSampler, VOiCEStratifiedSampler, Sampler
 from pipeline import Evaluator, Pipeline, WordErrorRate, BatchData
 import multiprocessing as mp
 import pickle
@@ -27,17 +27,17 @@ DATA_SET_PATH="/data"
 #     ('model', ['wav2vec2-base', 'wav2vec2-large-10m', 'hubert-large', 'hubert-xlarge'])
 # ]
 
-# knobs = [
-#     ('audio_sample_rate', [12000]),
-#     ('frequency_mask_width', [2000]),
-#     ('model', ['wav2vec2-large-10m', 'hubert-large'])
-# ]
-
 knobs = [
-    ('audio_sample_rate', [16000]),
-    ('frequency_mask_width', [4000]),
-    ('model', ['wav2vec2-large-960h'])
+    ('audio_sample_rate', [14000]),
+    ('frequency_mask_width', [2000]),
+    ('model', ['wav2vec2-large-10m', 'hubert-large'])
 ]
+
+# knobs = [
+#     ('audio_sample_rate', [16000]),
+#     ('frequency_mask_width', [4000]),
+#     ('model', ['wav2vec2-large-960h'])
+# ]
 
 ref_df = pd.read_csv(DATA_SET_PATH + '/VOiCES_devkit/references/filename_transcripts')
 ref_df.set_index('file_name', inplace=True)
@@ -176,7 +176,7 @@ def bootstrap_profile_pipeline():
     wave_to_text = WaveToText(pipe_args)
     decoder = Decoder(pipe_args)
 
-    print(f"Bootrap profile args: {pipe_args}")
+    print(f"Profile args: {pipe_args}")
     print("start bootstraping")
     boostrap_sample_per_stratum = 10
     n_stratum = 16
@@ -233,13 +233,31 @@ def bootstrap_profile_pipeline():
     profile_result['total_profile_time'] = time.time() - start_time
 
     return profile_result
-    
-def profile_pipeline_cached(method: str):
+   
+
+def prepare_sampler(method: str):
+    if method == "stratified_natural":
+        with open("./cache/cluster_natural.json", "r") as f:
+            cluster = json.load(f)
+        sampler = VOiCEStratifiedSampler(cluster)
+    elif method == "stratified_kmeans":
+        with open("./cache/cluster_kmeans.json", "r") as f:
+            cluster = json.load(f)
+        sampler = VOiCEStratifiedSampler(cluster)
+    else:
+        with open("./cache/cluster_natural.json", "r") as f:
+            cluster = json.load(f)
+        keys = list(cluster.keys())
+        sampler = VOiCERandomSampler(keys)
+    return sampler
+ 
+def profile_pipeline_cached(method: str, sampler: Sampler):
+    method = method.split('_')[0]
     assert(method in ["bootstrap", "stratified", "random"])
     start_time = time.time()
 
     pipe_args = get_pipeline_args()
-    print(f"Bootrap profile args: {pipe_args}")
+    print(f"Profile args: {pipe_args}")
 
     cache = load_cache(pipe_args)
     profile_result = {}
@@ -256,11 +274,6 @@ def profile_pipeline_cached(method: str):
     n_stratum = 16
     group_accuracy = [[] for i in range(16)]
     accuracy = []
-    
-    if method == "bootstrap":
-        sampler = VOiCEBootstrapSampler(n_stratum * bt_per_stratum)
-    else:
-        sampler = VOiCERandomSampler()
     
     print("Init done, taking time: ", time.time() - start_time)
     
@@ -313,15 +326,17 @@ def profile_pipeline_cached(method: str):
     profile_result['cummulative_accuracy'] = cul_accuracy
     # profile_result['corrected_acc'] = np.sum([np.sum(group_accuracy[i]) / total for i in range(16)])
     
-    corrected_acc = 0
-    len_group = total / 16
-    print("Len group: ", len_group)
-    for i in range(16):
-        print(f"Group {i}: {np.mean(group_accuracy[i]):4f} {len(group_accuracy[i])}")
-        corrected_acc += np.mean(group_accuracy[i]) * len_group / len(group_accuracy[i])
-    corrected_acc /= 16
-    profile_result['corrected_acc'] = corrected_acc
-    print(f"Corrected acc: {profile_result['corrected_acc']}")
+    if method == "bootstrap":
+        corrected_acc = 0
+        len_group = total / 16
+        print("Len group: ", len_group)
+        for i in range(16):
+            print(f"Group {i}: {np.mean(group_accuracy[i]):4f} {len(group_accuracy[i])}")
+            corrected_acc += np.mean(group_accuracy[i]) * len_group / len(group_accuracy[i])
+        corrected_acc /= 16
+        profile_result['corrected_acc'] = corrected_acc
+        print(f"Corrected acc: {profile_result['corrected_acc']}")
+        
     return profile_result
       
 # use Pipeline to get cache
@@ -376,7 +391,7 @@ def start_prepare():
                 torch.cuda.empty_cache()
 
 def start_exp(result_fname, method, num):
-    if method not in ["bootstrap", "stratified", "random"]:
+    if method.split("_")[0] not in ["bootstrap", "stratified", "random"]:
         raise ValueError("Method must be one of 'bootstrap', 'stratified', 'random'")
     records = []
     for audio_sr in knobs[0][1]:
@@ -386,7 +401,8 @@ def start_exp(result_fname, method, num):
                 os.environ["frequency_mask_width"] = str(freq_mask)
                 os.environ["model"] = str(model)
                 for i in range(num):
-                    result = profile_pipeline_cached(method)
+                    sampler = prepare_sampler(method)
+                    result = profile_pipeline_cached(method, sampler)
                     records.append(dict(
                         idx=i,
                         method=method,
@@ -395,29 +411,22 @@ def start_exp(result_fname, method, num):
                         model=model,
                         result=result
                     ))
-                    print(f"Done {i} {audio_sr} {freq_mask} {model} ")
+                    print(f"Done {i} {audio_sr} {freq_mask} {model} {method}")
     with open(result_fname, 'w') as fp:
         records = json.dump(records, fp)  
 
 
 if __name__ == "__main__":
-    # addr, port = 'localhost', 12343
-    # start_connect(addr, port)
-    # method = "random"
-    
-    # mp.set_start_method('spawn')
-    # procs = []
-    
     # num = 2
     # for method in ["random", "stratified"]:
     #     for i in range(num):
     #         start_exp(f"./result/{method}_{i}.json", method)
     
-    # num = 5
-    # date_time_str = time.strftime("%Y-%m-%d-%H-%M-%S")
-    # # for method in ["bootstrap", "stratified", "random"]:
-    # for method in ["bootstrap"]:
-    #     start_exp(f"./result/{method}_{date_time_str}.json", method, num)
-    #     print(f"Save to {method}_{date_time_str}.json")
+    num = 5
+    date_time_str = time.strftime("%Y-%m-%d-%H-%M-%S")
+    # for method in ["bootstrap", "stratified", "random"]:
+    for method in ["stratified_natural", "stratified_kmeans", "random"]:
+        start_exp(f"./result/{method}_{date_time_str}.json", method, num)
+        print(f"Save to {method}_{date_time_str}.json")
 
-    start_prepare()
+    # start_prepare()

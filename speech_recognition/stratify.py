@@ -3,26 +3,26 @@ import torch
 import pickle
 from torch.nn.utils.rnn import pad_sequence
 import json
-def kmeans_sklearn(X, K, num_iters=100):
-    X_np = X.cpu().numpy()  # Convert tensor to numpy array
-    kmeans = KMeans(n_clusters=K, max_iter=num_iters)
-    kmeans.fit(X_np)
-    return torch.tensor(kmeans.labels_), torch.tensor(kmeans.cluster_centers_)
 
-
-def load_data():
-    with open("./cache/embedding.pkl", "rb") as f:
-        data = pickle.load(f)
-    return data 
-    '''
-    data = {
-        "args" : {},
-        "results": {
-            filename: vec
+def kmeans_stratify():    
+    def kmeans_sklearn(X, K, num_iters=100):
+        X_np = X.cpu().numpy()  # Convert tensor to numpy array
+        kmeans = KMeans(n_clusters=K, max_iter=num_iters)
+        kmeans.fit(X_np)
+        return torch.tensor(kmeans.labels_), torch.tensor(kmeans.cluster_centers_)
+    def load_data():
+        with open("./cache/embedding.pkl", "rb") as f:
+            data = pickle.load(f)
+        return data 
+        '''
+        data = {
+            "args" : {},
+            "results": {
+                filename: vec
+            }
         }
-    }
-    '''
-if __name__ == "__main__":
+        '''
+        
     # Example usage
     data = load_data()
     E = data["results"]
@@ -38,11 +38,28 @@ if __name__ == "__main__":
     dump = dict()
     for (idx, k) in enumerate(E.keys()):
         dump.update({k: labels[idx]})
-    with open("./cache/cluster.json", "w") as f:
+    with open("./cache/cluster_kmeans.json", "w") as f:
         json.dump(dump, f)
-    # print(labels[:10], centers)
-    # X = torch.randn(100, 2)  # 100 points in 2D
-    # K = 3  # Number of clusters
-    # cluster_assignments, centers = kmeans_sklearn(X, K)
-    # print("Cluster assignments:", cluster_assignments)
-    # print("Cluster centers:", centers)
+
+def natural_stratify():
+
+    def get_idx(filename):
+        #Lab41-SRI-VOiCES-rm4-none-sp6518-ch066465-sg0028-mc01-stu-clo-dg130.wav
+        l1, l2 = filename.split('-')[3], filename.split('-')[4]
+        l1s = ["rm1", "rm2", "rm3", "rm4"]
+        l2s = ['babb', 'musi', 'none', 'tele']
+        return l1s.index(l1) * len(l2s) + l2s.index(l2)
+    
+    with open("./cache/embedding.pkl", "rb") as f:
+        data = pickle.load(f)
+    
+    keys = list(data["results"].keys())
+    dump = {}
+    for k in keys:
+        dump.update({k: get_idx(k)})
+    with open("./cache/cluster_natural.json", "w") as f:
+        json.dump(dump, f)
+    
+if __name__ == "__main__":
+    natural_stratify()
+
