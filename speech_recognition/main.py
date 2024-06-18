@@ -8,7 +8,7 @@ import tqdm
 import pandas as pd
 import numpy as np
 from op import AudioSampler, NoiseReduction, WaveToText, Decoder
-from sampler import VOiCERandomSampler, VOiCEBootstrapSampler, VOiCEStratifiedSampler, Sampler
+from sampler import VOiCERandomSampler, VOiCEBootstrapSampler, VOiCEStratifiedSampler, Sampler, VOiCEStratifiedWeightedSampler
 from pipeline import Evaluator, Pipeline, WordErrorRate, BatchData
 import multiprocessing as mp
 import pickle
@@ -21,17 +21,17 @@ DATA_SET_PATH="/data"
 #     ('model', ['wav2vec2-base', 'wav2vec2-large-10m', 'wav2vec2-large-960h', 'hubert-large', 'hubert-xlarge'])
 # ]
 
-# knobs = [
-#     ('audio_sample_rate', [12000, 14000, 16000]),
-#     ('frequency_mask_width', [500, 2000, 4000]),
-#     ('model', ['wav2vec2-base', 'wav2vec2-large-10m', 'hubert-large', 'hubert-xlarge'])
-# ]
-
 knobs = [
-    ('audio_sample_rate', [14000]),
+    ('audio_sample_rate', [12000, 14000, 16000]),
     ('frequency_mask_width', [2000]),
-    ('model', ['wav2vec2-large-10m', 'hubert-large'])
+    ('model', ['wav2vec2-base', 'wav2vec2-large-10m', 'hubert-large', 'hubert-xlarge'])
 ]
+
+# knobs = [
+#     ('audio_sample_rate', [14000]),
+#     ('frequency_mask_width', [2000]),
+#     ('model', ['wav2vec2-large-10m', 'hubert-large'])
+# ]
 
 # knobs = [
 #     ('audio_sample_rate', [16000]),
@@ -239,11 +239,13 @@ def prepare_sampler(method: str):
     if method == "stratified_natural":
         with open("./cache/cluster_natural.json", "r") as f:
             cluster = json.load(f)
-        sampler = VOiCEStratifiedSampler(cluster)
+        sampler = VOiCEStratifiedWeightedSampler(cluster)
+        # sampler = VOiCEStratifiedSampler(cluster)
     elif method == "stratified_kmeans":
         with open("./cache/cluster_kmeans.json", "r") as f:
             cluster = json.load(f)
-        sampler = VOiCEStratifiedSampler(cluster)
+        sampler = VOiCEStratifiedWeightedSampler(cluster)
+        # sampler = VOiCEStratifiedSampler(cluster)
     else:
         with open("./cache/cluster_natural.json", "r") as f:
             cluster = json.load(f)
@@ -252,6 +254,7 @@ def prepare_sampler(method: str):
     return sampler
  
 def profile_pipeline_cached(method: str, sampler: Sampler):
+    sampler.init()
     method = method.split('_')[0]
     assert(method in ["bootstrap", "stratified", "random"])
     start_time = time.time()
@@ -320,8 +323,8 @@ def profile_pipeline_cached(method: str, sampler: Sampler):
     
     cul_accuracy = [sum(accuracy[:i+1])/(i+1) for i in range(len(accuracy))]    
         
-    profile_result["group_acc"] = [np.mean(group_accuracy[i]) for i in range(16)]
-    profile_result["group_std"] = [np.std(group_accuracy[i]) for i in range(16)]
+    # profile_result["group_acc"] = [np.mean(group_accuracy[i]) for i in range(16)]
+    # profile_result["group_std"] = [np.std(group_accuracy[i]) for i in range(16)]
     profile_result['accuracy'] = accuracy
     profile_result['cummulative_accuracy'] = cul_accuracy
     # profile_result['corrected_acc'] = np.sum([np.sum(group_accuracy[i]) / total for i in range(16)])
@@ -422,11 +425,12 @@ if __name__ == "__main__":
     #     for i in range(num):
     #         start_exp(f"./result/{method}_{i}.json", method)
     
-    num = 5
+    num = 10
     date_time_str = time.strftime("%Y-%m-%d-%H-%M-%S")
     # for method in ["bootstrap", "stratified", "random"]:
     for method in ["stratified_natural", "stratified_kmeans", "random"]:
-        start_exp(f"./result/{method}_{date_time_str}.json", method, num)
-        print(f"Save to {method}_{date_time_str}.json")
+        method_f = method.replace('_', '@')
+        start_exp(f"./result/{method_f}_{date_time_str}.json", method, num)
+        print(f"Save to {method_f}_{date_time_str}.json")
 
     # start_prepare()

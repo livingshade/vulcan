@@ -7,13 +7,15 @@ import time
 
 
 color_map = {
-    "random": "r",
-    "stratified": "b",
-    "bootstrap": "g",
+    "random": "red",
+    "stratified": "blue",
+    "bootstrap": "orange",
+    "stratified_natural": "blue",
+    "stratified_kmeans": "brown",
 }
 
 knobs = {
-    'audio_sr': [12000],
+    'audio_sr': [12000, 14000],
     'freq_mask': [2000],
     'model': ['wav2vec2-large-10m', 'hubert-large']
 }
@@ -27,14 +29,16 @@ def draw_new(records, prefix=""):
         audio_sr = r['audio_sr']
         freq_mask = r['freq_mask']
         model = r['model']
+        method = r['method']
         if model in knobs["model"] and audio_sr in knobs["audio_sr"] and freq_mask in knobs["freq_mask"]:
             key = f"{audio_sr}_{freq_mask}_{model}"
             if key not in figures_dict:
                 num_fig += 1
                 figures_dict[key] = []
             figures_dict[key].append(r)
+            # print(f"audio_sr: {audio_sr}, freq_mask: {freq_mask}, model: {model}, method: {method}")
     
-    print(num_fig)
+    print("Num figure " ,num_fig)
     fig, axs = plt.subplots(num_fig, figsize=(15,15))
         
     for axid, k in enumerate(figures_dict.keys()):
@@ -55,9 +59,9 @@ def draw_new(records, prefix=""):
             skip = 100
             xid = range(len(cul_acc[skip:]))
             
-            
-            ax.plot(xid, cul_acc[skip:], label=method, color=color_map[method], linewidth=0.5)
-            
+            if method != "random":
+                ax.plot(xid, cul_acc[skip:], label=method, color=color_map[method], linewidth=0.75)
+                print(f"audio_sr: {audio_sr}, freq_mask: {freq_mask}, model: {model}, method: {method}")
             if sample_idx == 0 and method == "random":
                 print(f"audio_sr: {audio_sr}, freq_mask: {freq_mask}, model: {model}")
                 ax.set_xlabel('# sample')
@@ -69,7 +73,7 @@ def draw_new(records, prefix=""):
                 ground_truth = cul_acc[-1]
                 ax.axhline(y=ground_truth + 0.01, color='g', linestyle='dashed', label='acc+1%')
                 ax.axhline(y=ground_truth - 0.01, color='g', linestyle='dashed', label='acc-1%')
-                ax.set_ylim(ground_truth - 0.05, ground_truth + 0.05)
+                # ax.set_ylim(ground_truth - 0.05, ground_truth + 0.05)
                 
         handles, labels = ax.get_legend_handles_labels()
         by_label = dict(zip(labels, handles))
@@ -103,7 +107,7 @@ if __name__ == "__main__":
                 continue
             method = filename.split("_")[0]
             date = filename.split("_")[1].split(".")[0]
-            if date != "2024-06-07-01-41-50":
+            if date != "2024-06-18-05-22-07":
                 continue
             print("Load file: ", filename)
             # idx = filename.split("_")[1]

@@ -199,6 +199,10 @@ class VOiCEStratifiedSampler(Sampler):
             [k for k in self.keys if self.k2g[k] == i] for i in range(self.n_groups)
         ]
         self.group_idx = [0] * self.n_groups
+        res = ""
+        for i in self.group:
+            res = res + " " + str(len(i))
+        print(f"Stratified Sampler: {res}")
         
     def init(self):        
         self.next_group = 0
@@ -221,3 +225,46 @@ class VOiCEStratifiedSampler(Sampler):
             return self.stratified_sample()
         else:
             raise Exception(f"Invalid sample method [{method}] for VOiCEStratifiedSampler")
+        
+        
+class VOiCEStratifiedWeightedSampler(Sampler):
+    def __init__(self, cluster):
+        self.keys = list(cluster.keys()).copy()
+        self.k2g = cluster.copy()
+        self.n_groups = len(set(list(cluster.values())))
+        self.next_group = 0
+        self.group = [
+            [k for k in self.keys if self.k2g[k] == i] for i in range(self.n_groups)
+        ]
+        self.group_idx = [0] * self.n_groups
+        res = ""
+        for i in self.group:
+            res = res + " " + str(len(i))
+        print(f"Weighted Sampler: {res}")
+        
+    def init(self):        
+        self.next_group = 0
+        self.group_idx = [0] * self.n_groups
+        for i in range(self.n_groups):
+            random.shuffle(self.group[i])
+            
+        random.shuffle(self.keys)
+       
+    def sample_group(self):
+        key = random.choice(self.keys)
+        return self.k2g[key]
+    
+    def stratified_sample(self):
+        g = self.sample_group()
+        
+        idx = self.group_idx[g]
+        self.group_idx[g] = (self.group_idx[g] + 1) % len(self.group[g])
+        key = self.group[g][idx]
+        
+        return key
+    
+    def sample(self, method):
+        if method == "stratified":
+            return self.stratified_sample()
+        else:
+            raise Exception(f"Invalid sample method [{method}] for VOiCEStratifiedWeightedSampler")
