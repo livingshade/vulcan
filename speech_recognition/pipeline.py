@@ -44,7 +44,7 @@ class Pipeline():
             x = op.process(x)
         result = self.ev.evaluate(x["prediction"], batch.label)
         self.results.append(result)
-        return result
+        return result, x
     
     def run_cached(self, name):
         return self.cache["results"][name]["metric"]

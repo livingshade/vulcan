@@ -11,6 +11,7 @@ from op import AudioSampler, NoiseReduction, WaveToText, Decoder
 from sampler import VOiCERandomSampler, VOiCEBootstrapSampler
 from pipeline import Evaluator, Pipeline, WordErrorRate, BatchData
 import multiprocessing as mp
+import pickle
 
 DATA_SET_PATH="/data"
 
@@ -26,10 +27,16 @@ DATA_SET_PATH="/data"
 #     ('model', ['wav2vec2-base', 'wav2vec2-large-10m', 'hubert-large', 'hubert-xlarge'])
 # ]
 
+# knobs = [
+#     ('audio_sample_rate', [12000]),
+#     ('frequency_mask_width', [2000]),
+#     ('model', ['wav2vec2-large-10m', 'hubert-large'])
+# ]
+
 knobs = [
-    ('audio_sample_rate', [12000]),
-    ('frequency_mask_width', [2000]),
-    ('model', ['wav2vec2-large-10m', 'hubert-large'])
+    ('audio_sample_rate', [16000]),
+    ('frequency_mask_width', [4000]),
+    ('model', ['wav2vec2-large-960h'])
 ]
 
 ref_df = pd.read_csv(DATA_SET_PATH + '/VOiCES_devkit/references/filename_transcripts')
@@ -342,13 +349,18 @@ def profile_pipeline_normal(sample_method: str):
             'transcript': transcript,
             'prediction': None,
         },label=transcript)
-        result = pipeline.run(batch_data)
-        eval_result.update({filename: {"metric": result}})
-        
-    dump = {"args": pipe_args, "eval": "wer", "results": eval_result}    
-    with open(f"./cache/{dump_filename}.json", 'w') as f:
-        f.write(json.dumps(dump))
-    print(f"Done, saved to {dump_filename}")
+        result, data = pipeline.run(batch_data)
+        # eval_result.update({filename: {"metric": result}})
+        embedding = data["emission"]
+        eval_result.update({filename: embedding})     
+        print(f"Done {filename} {embedding.shape}")   
+    # dump = {"args": pipe_args, "eval": "wer", "results": eval_result}    
+    # with open(f"./cache/{dump_filename}.json", 'w') as f:
+    #     f.write(json.dumps(dump))
+    # print(f"Done, saved to {dump_filename}")
+    dump = {"args": pipe_args, "results": eval_result}
+    with open("./cache/embedding.pkl", 'wb') as f:
+        pickle.dump(dump, f, pickle.HIGHEST_PROTOCOL)
     return 
       
 # use this to get cache
@@ -401,11 +413,11 @@ if __name__ == "__main__":
     #     for i in range(num):
     #         start_exp(f"./result/{method}_{i}.json", method)
     
-    num = 5
-    date_time_str = time.strftime("%Y-%m-%d-%H-%M-%S")
-    # for method in ["bootstrap", "stratified", "random"]:
-    for method in ["bootstrap"]:
-        start_exp(f"./result/{method}_{date_time_str}.json", method, num)
-        print(f"Save to {method}_{date_time_str}.json")
+    # num = 5
+    # date_time_str = time.strftime("%Y-%m-%d-%H-%M-%S")
+    # # for method in ["bootstrap", "stratified", "random"]:
+    # for method in ["bootstrap"]:
+    #     start_exp(f"./result/{method}_{date_time_str}.json", method, num)
+    #     print(f"Save to {method}_{date_time_str}.json")
 
-    # start_prepare()
+    start_prepare()

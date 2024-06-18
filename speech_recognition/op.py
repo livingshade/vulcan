@@ -130,7 +130,6 @@ class WaveToText(ProcessOp):
         
         batch_data['audio'] = None
         batch_data['emission'] = emission[0]
-        
         if profile_compute_latency:
             self.compute_latencies.append(time.time()-start_compute_time) 
 
