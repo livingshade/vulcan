@@ -1,6 +1,8 @@
 import os
 import random
 
+UNIT_LEN = 1000
+
 class Sampler():
     def __init__(self) -> None:
         pass
@@ -194,29 +196,42 @@ class VOiCEStratifiedSampler(Sampler):
         self.keys = list(cluster.keys()).copy()
         self.k2g = cluster.copy()
         self.n_groups = len(set(list(cluster.values())))
+        self.group_order = list(range(self.n_groups))
         self.next_group = 0
         self.group = [
             [k for k in self.keys if self.k2g[k] == i] for i in range(self.n_groups)
         ]
         self.group_idx = [0] * self.n_groups
+        self.group_weight = [float(len(i)) / len(self.keys) for i in self.group]
         res = ""
         for i in self.group:
             res = res + " " + str(len(i))
         print(f"Stratified Sampler: {res}")
         
-    def init(self):        
+    def init(self):
+        self.group_order = list(range(self.n_groups))
+        random.shuffle(self.group_order)
+        
         self.next_group = 0
         self.group_idx = [0] * self.n_groups
         for i in range(self.n_groups):
             random.shuffle(self.group[i])
         
     def stratified_sample(self):
-        g = self.next_group
-        self.next_group = (self.next_group + 1) % self.n_groups
+        w = float(self.next_group) / UNIT_LEN
         
-        idx = self.group_idx[g]
-        self.group_idx[g] = (self.group_idx[g] + 1) % len(self.group[g])
-        key = self.group[g][idx]
+        self.next_group = (self.next_group + 1) % UNIT_LEN
+
+        cul_w = 0
+        key = None
+        for i in range(self.n_groups):
+            gid = self.group_order[i]
+            cul_w += self.group_weight[gid]
+            if cul_w > w:
+                idx = self.group_idx[gid]
+                self.group_idx[gid] = (self.group_idx[gid] + 1) % len(self.group[gid])
+                key = self.group[gid][idx]
+                break
         
         return key
     

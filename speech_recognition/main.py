@@ -24,7 +24,7 @@ DATA_SET_PATH="/data"
 knobs = [
     ('audio_sample_rate', [12000, 14000, 16000]),
     ('frequency_mask_width', [2000]),
-    ('model', ['wav2vec2-base', 'wav2vec2-large-10m', 'hubert-large', 'hubert-xlarge'])
+    ('model', ['wav2vec2-large-10m', 'wav2vec2-large-960h', 'hubert-large', 'hubert-xlarge'])
 ]
 
 # knobs = [
@@ -428,7 +428,7 @@ if __name__ == "__main__":
     num = 10
     date_time_str = time.strftime("%Y-%m-%d-%H-%M-%S")
     # for method in ["bootstrap", "stratified", "random"]:
-    for method in ["stratified_natural", "stratified_kmeans", "random"]:
+    for method in ["stratified_kmeans", "stratified_natural", "random"]:
         method_f = method.replace('_', '@')
         start_exp(f"./result/{method_f}_{date_time_str}.json", method, num)
         print(f"Save to {method_f}_{date_time_str}.json")

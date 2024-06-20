@@ -11,15 +11,21 @@ color_map = {
     "stratified": "blue",
     "bootstrap": "orange",
     "stratified_natural": "blue",
-    "stratified_kmeans": "brown",
+    "stratified_kmeans": "orange",
 }
 
 knobs = {
-    'audio_sr': [12000, 14000],
+    'audio_sr': [12000],
     'freq_mask': [2000],
-    'model': ['wav2vec2-large-10m', 'hubert-large']
+    'model': ['wav2vec2-large-10m', 'wav2vec2-large-960h', 'hubert-large', 'hubert-xlarge']
 }
 
+
+# knobs = [
+#     ('audio_sample_rate', [12000, 14000, 16000]),
+#     ('frequency_mask_width', [2000]),
+#     ('model', ['wav2vec2-base', 'wav2vec2-large-10m', 'hubert-large', 'hubert-xlarge'])
+# ]
 
 def draw_new(records, prefix=""):
     plt.cla()
@@ -40,7 +46,7 @@ def draw_new(records, prefix=""):
     
     print("Num figure " ,num_fig)
     fig, axs = plt.subplots(num_fig, figsize=(15,15))
-        
+    fig.tight_layout(h_pad=3)    
     for axid, k in enumerate(figures_dict.keys()):
         ax = axs[axid]
         # ax = fig.add_subplot()
@@ -60,7 +66,7 @@ def draw_new(records, prefix=""):
             xid = range(len(cul_acc[skip:]))
             
             if method != "random":
-                ax.plot(xid, cul_acc[skip:], label=method, color=color_map[method], linewidth=0.75)
+                ax.plot(xid, cul_acc[skip:], label=method, color=color_map[method], linewidth=0.65)
                 print(f"audio_sr: {audio_sr}, freq_mask: {freq_mask}, model: {model}, method: {method}")
             if sample_idx == 0 and method == "random":
                 print(f"audio_sr: {audio_sr}, freq_mask: {freq_mask}, model: {model}")
@@ -73,7 +79,7 @@ def draw_new(records, prefix=""):
                 ground_truth = cul_acc[-1]
                 ax.axhline(y=ground_truth + 0.01, color='g', linestyle='dashed', label='acc+1%')
                 ax.axhline(y=ground_truth - 0.01, color='g', linestyle='dashed', label='acc-1%')
-                # ax.set_ylim(ground_truth - 0.05, ground_truth + 0.05)
+                ax.set_ylim(ground_truth - 0.05, ground_truth + 0.05)
                 
         handles, labels = ax.get_legend_handles_labels()
         by_label = dict(zip(labels, handles))
@@ -107,7 +113,7 @@ if __name__ == "__main__":
                 continue
             method = filename.split("_")[0]
             date = filename.split("_")[1].split(".")[0]
-            if date != "2024-06-18-05-22-07":
+            if date != "2024-06-18-09-03-03":
                 continue
             print("Load file: ", filename)
             # idx = filename.split("_")[1]
