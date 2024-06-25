@@ -42,8 +42,9 @@ def profile_pipeline():
     num_profile_batch = 100 #Cab't be small because of warm-up
     dataloader = DataLoader(nuimage_data, batch_size=1, shuffle=False) 
 
-    for index, data in tqdm.tqdm(enumerate(dataloader)):
+    for index, data in enumerate(dataloader):
         batch_data = {
+            'fname': data[2],
             'images': data[0], 
             'labels': data[1],
             'org_image_shape': org_image_shape 
@@ -91,6 +92,53 @@ def profile_pipeline():
 
     return profile_result
     
+def profile_pipeline_normal():
+    detector_args = get_detector_args()
+    voxelization_args = get_voxelization_args()
+    voxelization = Voxelization((900, 1600), voxelization_args)
+    detector = Detector((900, 1600), detector_args)
+    
+    profile_result = {}
+
+    org_image_shape = (900, 1600)
+    nuimage_data = NuImageDataset()
+
+
+    print('start profile this pipeline ...', voxelization_args, detector_args)
+    start_time = time.time()
+
+    print('profile accuracy')
+    # Profile args:
+    batch_size = 64
+    num_workers = 8
+    dataloader = DataLoader(nuimage_data, batch_size=1, shuffle=False, num_workers=num_workers)
+
+    eval_result = {}
+    for data in dataloader:
+        batch_data = {
+            'images': data[0], 
+            'labels': data[1],
+            'org_image_shape': org_image_shape 
+        }
+        batch_data = voxelization.profile(batch_data)
+        batch_data = detector.profile(batch_data) 
+        fname = data[2][0]
+        last_accuracy = detector.get_last_accuracy()
+        # print(f'Accuracy: {last_accuracy} for {fname}')
+        eval_result.update({fname: last_accuracy})
+    dump = {
+        "args" : {
+            "voxelization": voxelization_args,
+            "detector": detector_args
+        },
+        "results" : eval_result
+    }
+    model = os.environ.get('model')
+    resize = os.environ.get('resize_factor')
+    with open(f"./cache/{model}_{resize}.json", "w") as fp:
+        json.dump(dump, fp)
+    return profile_result    
+
 def start_connect(host, port):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         
@@ -133,7 +181,7 @@ if __name__ == "__main__":
             for model in models:
                 os.environ["resize_factor"] = str(rf)
                 os.environ["model"] = str(model)
-                result = profile_pipeline() 
+                result = profile_pipeline_normal() 
                 print(result)
                 records.append(dict(
                     rf=rf,

@@ -21,7 +21,7 @@ device = 'cpu'
 if torch.cuda.is_available():
     device = 'cuda:0'
 
-data_root = '/data/wylin2/nuimages/'
+data_root = '/data/'
 data_version = 'v1.0-mini'
 
 class Loader(SourceOp):
@@ -156,7 +156,7 @@ class NuImageDataset(Dataset):
         
         padded_boxes = torch.tensor(padded_boxes)
 
-        return img_source, padded_boxes
+        return img_source, padded_boxes, img_fname
 
 class GroundRemoval(ProcessOp):
     def __init__(self):
@@ -314,3 +314,8 @@ class Detector(ProcessOp):
     
     def get_batch_accuracy(self):
         return self.batch_accuraies
+
+    def get_last_accuracy(self):
+        batch_accuracy = self.metric.compute()['map_50'].item()
+        self.metric = MeanAveragePrecision()
+        return batch_accuracy
