@@ -4,7 +4,7 @@ import pickle
 from torch.nn.utils.rnn import pad_sequence
 import json
 
-def kmeans_stratify():    
+def kmeans_hidden_stratify():    
     def kmeans_sklearn(X, K, num_iters=100):
         X_np = X.cpu().numpy()  # Convert tensor to numpy array
         kmeans = KMeans(n_clusters=K, max_iter=num_iters)
@@ -22,7 +22,6 @@ def kmeans_stratify():
             }
         }
         '''
-        
     # Example usage
     data = load_data()
     E = data["results"]
@@ -41,6 +40,43 @@ def kmeans_stratify():
     with open("./cache/cluster_kmeans.json", "w") as f:
         json.dump(dump, f)
 
+def label_grouping():
+    def kmeans_sklearn(X, K, num_iters=100):
+        X_np = X.cpu().numpy()  # Convert tensor to numpy array
+        kmeans = KMeans(n_clusters=K, max_iter=num_iters)
+        kmeans.fit(X_np)
+        return torch.tensor(kmeans.labels_), torch.tensor(kmeans.cluster_centers_)
+    knobs = {
+        "audio_sr": [16000],
+        "freq_mask": [2000],
+        "model": ['wav2vec2-large-960h']
+    }
+    for sr in knobs["audio_sr"]:
+        for mask in knobs["freq_mask"]:
+            for model in knobs["model"]:
+                filename = f"./cache/{sr}_{mask}_{model}.json"
+                with open(filename, "r") as f:
+                    data = json.load(f)
+                break
+    results = data["results"]
+    keys = list(results.keys())
+    X = [(k, results[k]["metric"]) for k in keys].copy()
+    # X = sorted(X, key=lambda x: x[1])
+    
+    X_feed = torch.Tensor([x[1] for x in X])
+    X_feed = X_feed.view(-1, 1)
+    # [6400, 1]
+    print(X_feed.shape)
+    K = 16
+    labels, centers = kmeans_sklearn(X_feed, K)
+    labels = [int(x) for x in labels]
+    dump = dict()
+    for (idx, k) in enumerate(keys):
+        dump.update({k: labels[idx]})
+    with open("./cache/group_kmeans.json", "w") as f:
+        json.dump(dump, f)
+
+    
 def natural_stratify():
 
     def get_idx(filename):
@@ -61,5 +97,5 @@ def natural_stratify():
         json.dump(dump, f)
     
 if __name__ == "__main__":
-    natural_stratify()
-
+    # kmeans_hidden_stratify()
+    label_grouping()
