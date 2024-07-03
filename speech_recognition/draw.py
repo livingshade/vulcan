@@ -11,7 +11,8 @@ color_map = {
     "stratified": "blue",
     "bootstrap": "orange",
     "stratified_natural": "blue",
-    "stratified_kmeans": "green",
+    "stratified_hidden": "green",
+    "stratified_label": "purple",
 }
 
 knobs = {
@@ -20,7 +21,7 @@ knobs = {
     'model': ['wav2vec2-large-10m', 'wav2vec2-large-960h', 'hubert-large', 'hubert-xlarge']
 }
 
-methods = ["random", "stratified_natural", "stratified_kmeans"]
+methods = ["random", "stratified_natural", "stratified_hidden", "stratified_label"]
 # knobs = [
 #     ('audio_sample_rate', [12000, 14000, 16000]),
 #     ('frequency_mask_width', [2000]),
@@ -88,7 +89,7 @@ def draw_new(records, prefix=""):
     print(f"Save to ./result/figures/{prefix}.png")
 
 
-def draw_average(records, prefix=""):
+def draw_average(records, per, prefix=""):
     plt.cla()
     figures_dict = {}
     num_fig = 0
@@ -113,7 +114,9 @@ def draw_average(records, prefix=""):
         cul_accs = {
             "random": [[] for i in range(6400)],
             "stratified_natural": [[] for i in range(6400)],
-            "stratified_kmeans": [[] for i in range(6400)],
+            "stratified_hidden": [[] for i in range(6400)],
+            "stratified_label": [[] for i in range(6400)],
+            "bootstrap": [[] for i in range(6400)],
         }
         # ax = fig.add_subplot()
         for idx, r in enumerate(figures_dict[k]):
@@ -153,28 +156,30 @@ def draw_average(records, prefix=""):
         def variance(lst):
             return sum([(x - average(lst))**2 for x in lst]) / len(lst)
         def percentile(lst, p):
-            return lst[int(len(lst) * p / 100.0)]
+            return lst[int(float(len(lst)) * p / 100.0)]
         
         for method in methods:
             upper_bound = []
             lower_bound = []
             for i in range(len(cul_accs[method])):
                 acc = sorted(cul_accs[method][i])
-                upper_bound.append(percentile(acc, 99))
-                lower_bound.append(percentile(acc, 1))
+                upper_bound.append(percentile(acc, per))
+                lower_bound.append(percentile(acc, 100 - per))
             # ax.fill_between(xid, lower_bound[skip:], upper_bound[skip:], color=color_map[method], alpha=0.25)
             ax.plot(xid, lower_bound[skip:], color=color_map[method], label=method,linewidth=0.7)
             ax.plot(xid, upper_bound[skip:], color=color_map[method],linewidth=0.7)
             # ax.plot([], [], color=color_map[method], label=method)
         handles, labels = ax.get_legend_handles_labels()
         by_label = dict(zip(labels, handles))
-        ax.legend(by_label.values(), by_label.keys())
+        ax.legend(by_label.values(), by_label.keys(), loc="right")
     plt.savefig(f"./result/figures/{prefix}.png")
     print(f"Save to ./result/figures/{prefix}.png")
 
     
 if __name__ == "__main__":
-    # assert(len(sys.argv) == 2)
+    assert(len(sys.argv) == 2)
+    date_expect = sys.argv[1]
+    assert(len(date_expect) > 0)
     # method = sys.argv[1]
     # idx = sys.argv[1]
 
@@ -198,7 +203,7 @@ if __name__ == "__main__":
                 continue
             method = filename.split("_")[0]
             date = filename.split("_")[1].split(".")[0]
-            if date != "2024-06-26-01-57-51":
+            if date != date_expect:
                 continue
             print("Load file: ", filename)
             # idx = filename.split("_")[1]
@@ -210,5 +215,7 @@ if __name__ == "__main__":
     # draw_new(records, f"all_{date_time}")
     for audio_sr in [12000, 14000, 16000]:
         knobs["audio_sr"] = [audio_sr]
-        draw_average(records, f"avg_{audio_sr}_{date_time}")
+        draw_average(records, 95, f"avg_p95_{audio_sr}_{date_time}")
+        draw_average(records, 99, f"avg_p99_{audio_sr}_{date_time}")
+
     # plot_new(records_random[0], f"random_0")

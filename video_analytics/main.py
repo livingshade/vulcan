@@ -139,6 +139,45 @@ def profile_pipeline_normal():
         json.dump(dump, fp)
     return profile_result    
 
+def profile_pipeline_cached():
+    detector_args = get_detector_args()
+    voxelization_args = get_voxelization_args()
+    voxelization = Voxelization((900, 1600), voxelization_args)
+    detector = Detector((900, 1600), detector_args)
+    
+    profile_result = {}
+
+    org_image_shape = (900, 1600)
+    nuimage_data = NuImageDataset()
+
+    print('profile accuracy')
+    # Profile args:
+    batch_size = 1
+    num_workers = 8
+    dataloader = DataLoader(nuimage_data, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+
+    cum_accuracy = []  
+    for data in tqdm.tqdm(dataloader):
+        batch_data = {
+            'images': data[0], 
+            'labels': data[1],
+            'org_image_shape': org_image_shape 
+        }
+        batch_data = voxelization.profile(batch_data)
+        batch_data = detector.profile(batch_data) 
+
+        cum_accuracy.append(detector.get_endpoint_accuracy())
+
+   
+    profile_result['accuracy'] = detector.get_endpoint_accuracy()
+    profile_result['profile_latency'] = time.time() - start_time
+    profile_result['cummulative_accuracy'] = cum_accuracy 
+    profile_result['batch_accuracy'] = detector.get_batch_accuracy()
+
+    return profile_result
+    
+
+
 def start_connect(host, port):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         

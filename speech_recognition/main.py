@@ -240,12 +240,14 @@ def prepare_sampler(method: str):
         with open("./cache/cluster_natural.json", "r") as f:
             cluster = json.load(f)
         sampler = VOiCEStratifiedWeightedSampler(cluster)
-        # sampler = VOiCEStratifiedSampler(cluster)
-    elif method == "stratified_kmeans":
-        with open("./cache/cluster_kmeans.json", "r") as f:
+    elif method == "stratified_hidden":
+        with open("./cache/cluster_hidden.json", "r") as f:
             cluster = json.load(f)
         sampler = VOiCEStratifiedWeightedSampler(cluster)
-        # sampler = VOiCEStratifiedSampler(cluster)
+    elif method == "stratified_label":
+        with open("./cache/cluster_label.json", "r") as f:
+            cluster = json.load(f)
+        sampler = VOiCEStratifiedWeightedSampler(cluster)
     else:
         with open("./cache/cluster_natural.json", "r") as f:
             cluster = json.load(f)
@@ -428,7 +430,7 @@ if __name__ == "__main__":
     num = 300
     date_time_str = time.strftime("%Y-%m-%d-%H-%M-%S")
     # for method in ["bootstrap", "stratified", "random"]:
-    for method in ["stratified_kmeans", "stratified_natural", "random"]:
+    for method in ["stratified_hidden", "stratified_label", "stratified_natural", "random"]:
         method_f = method.replace('_', '@')
         start_exp(f"./result/{method_f}_{date_time_str}.json", method, num)
         print(f"Save to {method_f}_{date_time_str}.json")
