@@ -6,6 +6,7 @@ import tqdm
 import time
 from torch.utils.data import DataLoader
 import argparse
+from pipeline import Pipeline, BatchData, MeanAveragePrecisionEvaluator
 # import torch
 
 def get_detector_args():
@@ -21,6 +22,18 @@ def get_loader_args():
     return {
         'batch_size': 1,
     }
+
+def get_pipeline_args(): 
+    return {
+        "model": os.environ.get('model'),
+        "resize_factor": os.environ.get('resize_factor')
+    }
+
+def load_cache(pipe_args):
+    dump_filename = '_'.join([str(i) for i in pipe_args.values()])
+    with open(f"./cache/{dump_filename}.json", 'r') as f:
+        dump = json.load(f)
+    return dump
 
 def profile_pipeline():
     detector_args = get_detector_args()
@@ -103,6 +116,7 @@ def profile_pipeline_normal():
     org_image_shape = (900, 1600)
     nuimage_data = NuImageDataset()
 
+    # pipeline = Pipeline("video_analytics", [voxelization, detector], MeanAveragePrecisionEvaluator(), None)
 
     print('start profile this pipeline ...', voxelization_args, detector_args)
     start_time = time.time()
@@ -126,6 +140,7 @@ def profile_pipeline_normal():
         last_accuracy = detector.get_last_accuracy()
         # print(f'Accuracy: {last_accuracy} for {fname}')
         eval_result.update({fname: last_accuracy})
+        
     dump = {
         "args" : {
             "voxelization": voxelization_args,
@@ -140,66 +155,39 @@ def profile_pipeline_normal():
     return profile_result    
 
 def profile_pipeline_cached():
+    cache = load_cache(get_pipeline_args())
     detector_args = get_detector_args()
     voxelization_args = get_voxelization_args()
     voxelization = Voxelization((900, 1600), voxelization_args)
     detector = Detector((900, 1600), detector_args)
+    
+    pipeline = Pipeline("video_analytics", [voxelization, detector], MeanAveragePrecisionEvaluator(), cache)
     
     profile_result = {}
 
     org_image_shape = (900, 1600)
     nuimage_data = NuImageDataset()
 
-    print('profile accuracy')
+    print('profile ', get_pipeline_args())
     # Profile args:
     batch_size = 1
     num_workers = 8
     dataloader = DataLoader(nuimage_data, batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
-    cum_accuracy = []  
-    for data in tqdm.tqdm(dataloader):
-        batch_data = {
-            'images': data[0], 
-            'labels': data[1],
-            'org_image_shape': org_image_shape 
-        }
-        batch_data = voxelization.profile(batch_data)
-        batch_data = detector.profile(batch_data) 
+    acc = []
+    cul_acc = []  
+    for data in dataloader:
+        fname = data[2][0]
+        result = pipeline.run_cached(fname)
+        acc.append(result)
+        cul_acc.append(sum(acc) / len(acc))
 
-        cum_accuracy.append(detector.get_endpoint_accuracy())
-
-   
-    profile_result['accuracy'] = detector.get_endpoint_accuracy()
-    profile_result['profile_latency'] = time.time() - start_time
-    profile_result['cummulative_accuracy'] = cum_accuracy 
-    profile_result['batch_accuracy'] = detector.get_batch_accuracy()
+    profile_result['args'] = get_pipeline_args()
+    profile_result['accuracy'] = acc
+    profile_result['cummulative_accuracy'] = cul_acc
 
     return profile_result
     
-
-
-def start_connect(host, port):
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        
-        s.settimeout(5) 
-        print('start connecnting...')
-
-        s.connect((host, port))  # Example TCP port
-        
-        # Receive start profiling command
-        cmd = s.recv(1024)
-        print(cmd)
-        
-        print('start profiling ... ')
-
-        profile_results = profile_pipeline()
-
-        print('end profiling')
-
-        
-        s.send(json.dumps(profile_results).encode())
-
-
 if __name__ == "__main__":
     
     
@@ -215,20 +203,20 @@ if __name__ == "__main__":
         records = []
         resize_factors = [0.8]
         models = ['yolov8n', 'yolov8s', 'yolov8m', 'yolov8l', 'yolov8x']
-
-        for rf in resize_factors:
-            for model in models:
-                os.environ["resize_factor"] = str(rf)
-                os.environ["model"] = str(model)
-                result = profile_pipeline_normal() 
-                print(result)
-                records.append(dict(
-                    rf=rf,
-                    model=model,
-                    result=result
-                ))
+        num = 1
+        for i in range(num):
+            for rf in resize_factors:
+                for model in models:
+                    os.environ["resize_factor"] = str(rf)
+                    os.environ["model"] = str(model)
+                    result = profile_pipeline_cached() 
+                    records.append(dict(
+                        rf=rf,
+                        model=model,
+                        result=result
+                    ))
         
-        with open ('profile_result.json', 'w') as fp:
+        with open ('./result/profile_result.json', 'w') as fp:
             json.dump(records, fp)
 
 

@@ -21,7 +21,7 @@ device = 'cpu'
 if torch.cuda.is_available():
     device = 'cuda:0'
 
-data_root = '/data/'
+data_root = '/data/sets/nuimages/'
 data_version = 'v1.0-mini'
 
 class Loader(SourceOp):
@@ -167,7 +167,6 @@ class Voxelization(ProcessOp):
         super().__init__()
         w = int(args['resize_factor'] * org_image_shape[0])
         h = int(args['resize_factor'] * org_image_shape[1])
-        print(w, h)
         self.resize = Resize(size=(h, w))
 
     def profile(self, batch_data, profile_input_size=False, profile_compute_latency=False):
@@ -187,6 +186,8 @@ class Voxelization(ProcessOp):
         batch_data['images'] = images
         return batch_data
 
+    def process(self, batch_data):
+        return self.profile(self, batch_data, False, False)
         
 
 class Detector(ProcessOp):
@@ -293,8 +294,13 @@ class Detector(ProcessOp):
         # mean_APs.append(mean_AP.item()) 
 
         # self.batch_accuraies.append(sum(mean_APs)/len(mean_APs)) 
-        return 
-    
+        batch_data["preds"] = preds
+        batch_data['targets'] = targets
+        return batch_data
+
+    def process(self, batch_data):
+        return self.profile(self, batch_data, False, False)
+        
     def record_preds(self, results):
 
         pass

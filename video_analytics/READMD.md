@@ -1,11 +1,19 @@
 # Nuimage Object Detection
 ## Dataset Preperation
-1. Download datasets
+
+1. Download Dataset
+```bash
+mkdir -p /data/sets/nuimages  # Make the directory to store the nuImages dataset in.
+wget https://www.nuscenes.org/data/nuimages-v1.0-mini.tgz  
+tar -xf nuimages-v1.0-mini.tgz -C /data/sets/nuimages  
+```
+<!-- 1. Download datasets
     - nuimages-v1.0-all-metadata.tgz  
     - nuimages-v1.0-all-samples.tgz 
-    - Extract: ```tar -xzf <filename>```
+    - Extract: ```tar -xzf <filename>``` -->
 2. Download requirements
     - ```pip install -r requirements.txt```
+
 
 ## Run without Container
 - step1: build index
