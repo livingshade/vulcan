@@ -67,14 +67,14 @@ def label_grouping():
     X_feed = X_feed.view(-1, 1)
     # [6400, 1]
     print(X_feed.shape)
-    K = 16
-    labels, centers = kmeans_sklearn(X_feed, K)
-    labels = [int(x) for x in labels]
-    dump = dict()
-    for (idx, k) in enumerate(keys):
-        dump.update({k: labels[idx]})
-    with open("./cache/group_kmeans.json", "w") as f:
-        json.dump(dump, f)
+    for K in [4, 8, 12, 16]:
+        labels, centers = kmeans_sklearn(X_feed, K)
+        labels = [int(x) for x in labels]
+        dump = dict()
+        for (idx, k) in enumerate(keys):
+            dump.update({k: labels[idx]})
+        with open(f"./cache/group_kmeans_{K}.json", "w") as f:
+            json.dump(dump, f)
 
     
 def natural_stratify():

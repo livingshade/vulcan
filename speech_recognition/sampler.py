@@ -241,17 +241,41 @@ class VOiCEStratifiedSampler(Sampler):
         else:
             raise Exception(f"Invalid sample method [{method}] for VOiCEStratifiedSampler")
         
+             
+class VOiCEGuidedSampler(Sampler):
+    
+    class Group():
+        def __init__(self, keys):
+            self.keys = keys
+            self.next = 0
+            self.results = []
+            self.variance = 1
+        def init(self):
+            random.shuffle(self.keys)
+            self.next = 0
+            self.results = []
+            self.variance = 1
+        def sample(self):
+            ne = self.next
+            self.next = (self.next + 1) % len(self.keys)
+            return ne
+        def feedback(self, result):
+            self.results.append(result)
+            self.variance = sum([(x - sum(self.results) / len(self.results)) ** 2 for x in self.results]) / len(self.results)
+        def __len__(self):
+            return len(self.keys)
         
-class VOiCEStratifiedWeightedSampler(Sampler):
     def __init__(self, cluster):
         self.keys = list(cluster.keys()).copy()
         self.k2g = cluster.copy()
         self.n_groups = len(set(list(cluster.values())))
         self.next_group = 0
-        self.group = [
-            [k for k in self.keys if self.k2g[k] == i] for i in range(self.n_groups)
+        self.groups = [
+            Group(
+                [k for k in self.keys if self.k2g[k] == i] for i in range(self.n_groups)
+            )
         ]
-        self.group_idx = [0] * self.n_groups
+        self.weights = [i.variance for i in range(self.n_groups)]
         res = ""
         for i in self.group:
             res = res + " " + str(len(i))
@@ -259,27 +283,26 @@ class VOiCEStratifiedWeightedSampler(Sampler):
         
     def init(self):        
         self.next_group = 0
-        self.group_idx = [0] * self.n_groups
-        for i in range(self.n_groups):
-            random.shuffle(self.group[i])
-            
-        random.shuffle(self.keys)
-       
+        for g in self.groups:
+            g.init()
+        self.weights = [i.variance for i in range(self.n_groups)]
+                   
     def sample_group(self):
-        key = random.choice(self.keys)
-        return self.k2g[key]
+        gid = random.choices(population=range(self.n_groups), weights=self.weights, k=1)[0]
+        return gid
     
-    def stratified_sample(self):
+    def stratified_sample_with_feedback(self):
         g = self.sample_group()
-        
-        idx = self.group_idx[g]
-        self.group_idx[g] = (self.group_idx[g] + 1) % len(self.group[g])
-        key = self.group[g][idx]
-        
+        key = self.groups[g].sample()
+        self.next_group = g
         return key
     
     def sample(self, method):
         if method == "stratified":
             return self.stratified_sample()
         else:
-            raise Exception(f"Invalid sample method [{method}] for VOiCEStratifiedWeightedSampler")
+            raise Exception(f"Invalid sample method [{method}] for VOiCEStratifiedWeightedSampler")   
+        
+    def feedback(self, result):
+        self.groups[self.next_group].feedback(result)
+        self.weights = [i.variance for i in range(self.n_groups)]

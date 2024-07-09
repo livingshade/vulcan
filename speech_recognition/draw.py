@@ -13,15 +13,18 @@ color_map = {
     "stratified_natural": "blue",
     "stratified_hidden": "green",
     "stratified_label": "purple",
+    "stratified_label_4": "blue",
+    "stratified_label_8": "green",
 }
 
 knobs = {
-    'audio_sr': [16000],
+    'audio_sr': [14000, 16000],
     'freq_mask': [2000],
-    'model': ['wav2vec2-large-10m', 'wav2vec2-large-960h', 'hubert-large', 'hubert-xlarge']
+    'model': ['wav2vec2-large-960h']
 }
 
-methods = ["random", "stratified_natural", "stratified_hidden", "stratified_label"]
+# methods = ["random", "stratified_natural", "stratified_hidden", "stratified_label"]
+methods = ["random", "stratified_label_4", "stratified_label_8"]
 # knobs = [
 #     ('audio_sample_rate', [12000, 14000, 16000]),
 #     ('frequency_mask_width', [2000]),
@@ -94,21 +97,26 @@ def draw_average(records, per, prefix=""):
     figures_dict = {}
     num_fig = 0
     for r in records:
-        audio_sr = r['audio_sr']
-        freq_mask = r['freq_mask']
-        model = r['model']
-        method = r['method']
+        audio_sr = int(r['audio_sr'])
+        freq_mask = int(r['freq_mask'])
+        model = str(r['model'])
+        method = str(r['method'])
+
         if model in knobs["model"] and audio_sr in knobs["audio_sr"] and freq_mask in knobs["freq_mask"]:
             key = f"{audio_sr}_{freq_mask}_{model}"
             if key not in figures_dict:
                 num_fig += 1
                 figures_dict[key] = []
+                print(f"audio_sr: {audio_sr}, freq_mask: {freq_mask}, model: {model}, method: {method}")
             figures_dict[key].append(r)
-            # print(f"audio_sr: {audio_sr}, freq_mask: {freq_mask}, model: {model}, method: {method}")
-    
-    print("Num figure " ,num_fig)
+
+    print("Num figure", num_fig)
     fig, axs = plt.subplots(num_fig, figsize=(15,15))
     fig.tight_layout(h_pad=3)    
+
+    if num_fig == 1:
+        axs = [axs]
+        
     for axid, k in enumerate(figures_dict.keys()):
         ax = axs[axid]
         cul_accs = {
@@ -117,6 +125,8 @@ def draw_average(records, per, prefix=""):
             "stratified_hidden": [[] for i in range(6400)],
             "stratified_label": [[] for i in range(6400)],
             "bootstrap": [[] for i in range(6400)],
+            "stratified_label_4": [[] for i in range(6400)],
+            "stratified_label_8": [[] for i in range(6400)],
         }
         # ax = fig.add_subplot()
         for idx, r in enumerate(figures_dict[k]):
@@ -213,7 +223,7 @@ if __name__ == "__main__":
                 
     date_time = time.strftime("%Y-%m-%d-%H-%M-%S")
     # draw_new(records, f"all_{date_time}")
-    for audio_sr in [12000, 14000, 16000]:
+    for audio_sr in [16000]:
         knobs["audio_sr"] = [audio_sr]
         draw_average(records, 95, f"avg_p95_{audio_sr}_{date_time}")
         draw_average(records, 99, f"avg_p99_{audio_sr}_{date_time}")

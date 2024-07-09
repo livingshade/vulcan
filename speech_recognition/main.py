@@ -8,7 +8,7 @@ import tqdm
 import pandas as pd
 import numpy as np
 from op import AudioSampler, NoiseReduction, WaveToText, Decoder
-from sampler import VOiCERandomSampler, VOiCEBootstrapSampler, VOiCEStratifiedSampler, Sampler, VOiCEStratifiedWeightedSampler
+from sampler import VOiCERandomSampler, VOiCEBootstrapSampler, VOiCEStratifiedSampler, Sampler
 from pipeline import Evaluator, Pipeline, WordErrorRate, BatchData
 import multiprocessing as mp
 import pickle
@@ -21,11 +21,11 @@ DATA_SET_PATH="/data"
 #     ('model', ['wav2vec2-base', 'wav2vec2-large-10m', 'wav2vec2-large-960h', 'hubert-large', 'hubert-xlarge'])
 # ]
 
-knobs = [
-    ('audio_sample_rate', [12000, 14000, 16000]),
-    ('frequency_mask_width', [2000]),
-    ('model', ['wav2vec2-large-10m', 'wav2vec2-large-960h', 'hubert-large', 'hubert-xlarge'])
-]
+# knobs = [
+#     ('audio_sample_rate', [12000, 14000, 16000]),
+#     ('frequency_mask_width', [2000]),
+#     ('model', ['wav2vec2-large-10m', 'wav2vec2-large-960h', 'hubert-large', 'hubert-xlarge'])
+# ]
 
 # knobs = [
 #     ('audio_sample_rate', [14000]),
@@ -33,11 +33,11 @@ knobs = [
 #     ('model', ['wav2vec2-large-10m', 'hubert-large'])
 # ]
 
-# knobs = [
-#     ('audio_sample_rate', [16000]),
-#     ('frequency_mask_width', [4000]),
-#     ('model', ['wav2vec2-large-960h'])
-# ]
+knobs = [
+    ('audio_sample_rate', [14000, 16000]),
+    ('frequency_mask_width', [2000]),
+    ('model', ['wav2vec2-large-960h'])
+]
 
 ref_df = pd.read_csv(DATA_SET_PATH + '/VOiCES_devkit/references/filename_transcripts')
 ref_df.set_index('file_name', inplace=True)
@@ -239,15 +239,16 @@ def prepare_sampler(method: str):
     if method == "stratified_natural":
         with open("./cache/cluster_natural.json", "r") as f:
             cluster = json.load(f)
-        sampler = VOiCEStratifiedWeightedSampler(cluster)
+        sampler = VOiCEStratifiedSampler(cluster)
     elif method == "stratified_hidden":
         with open("./cache/cluster_hidden.json", "r") as f:
             cluster = json.load(f)
-        sampler = VOiCEStratifiedWeightedSampler(cluster)
-    elif method == "stratified_label":
-        with open("./cache/cluster_label.json", "r") as f:
+        sampler = VOiCEStratifiedSampler(cluster)
+    elif method.startswith("stratified_label"):
+        k = int(method.split('_')[-1])
+        with open(f"./cache/cluster_label_{k}.json", "r") as f:
             cluster = json.load(f)
-        sampler = VOiCEStratifiedWeightedSampler(cluster)
+        sampler = VOiCEStratifiedSampler(cluster)
     else:
         with open("./cache/cluster_natural.json", "r") as f:
             cluster = json.load(f)
@@ -427,10 +428,10 @@ if __name__ == "__main__":
     #     for i in range(num):
     #         start_exp(f"./result/{method}_{i}.json", method)
     
-    num = 1
+    num = 300
     date_time_str = time.strftime("%Y-%m-%d-%H-%M-%S")
     # for method in ["bootstrap", "stratified", "random"]:
-    for method in ["stratified_hidden", "stratified_label", "stratified_natural", "random"]:
+    for method in ["stratified_label_4", "stratified_label_8", "random"]:
         method_f = method.replace('_', '@')
         start_exp(f"./result/{method_f}_{date_time_str}.json", method, num)
         print(f"Save to {method_f}_{date_time_str}.json")
