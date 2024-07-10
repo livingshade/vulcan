@@ -10,11 +10,10 @@ color_map = {
     "random": "red",
     "stratified": "blue",
     "bootstrap": "orange",
-    "stratified_natural": "blue",
-    "stratified_hidden": "green",
-    "stratified_label": "purple",
     "stratified_label_4": "blue",
     "stratified_label_8": "green",
+    "guided_4": "green",
+    "guided_8": "blue",
 }
 
 knobs = {
@@ -24,7 +23,9 @@ knobs = {
 }
 
 # methods = ["random", "stratified_natural", "stratified_hidden", "stratified_label"]
-methods = ["random", "stratified_label_4", "stratified_label_8"]
+# methods = ["random", "stratified_label_4", "stratified_label_8"]
+methods = ["random", "stratified_label_4", "guided_4"]
+
 # knobs = [
 #     ('audio_sample_rate', [12000, 14000, 16000]),
 #     ('frequency_mask_width', [2000]),
@@ -127,6 +128,7 @@ def draw_average(records, per, prefix=""):
             "bootstrap": [[] for i in range(6400)],
             "stratified_label_4": [[] for i in range(6400)],
             "stratified_label_8": [[] for i in range(6400)],
+            "guided_4": [[] for i in range(6400)],
         }
         # ax = fig.add_subplot()
         for idx, r in enumerate(figures_dict[k]):
