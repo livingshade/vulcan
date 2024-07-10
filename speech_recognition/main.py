@@ -36,7 +36,7 @@ DATA_SET_PATH="/data"
 knobs = [
     ('audio_sample_rate', [14000, 16000]),
     ('frequency_mask_width', [2000]),
-    ('model', ['wav2vec2-large-960h', 'hubert-xlarge'])
+    ('model', ['wav2vec2-large-960h'])
 ]
 
 ref_df = pd.read_csv(DATA_SET_PATH + '/VOiCES_devkit/references/filename_transcripts')
