@@ -485,10 +485,10 @@ if __name__ == "__main__":
     #     for i in range(num):
     #         start_exp(f"./result/{method}_{i}.json", method)
     
-    num = 1
+    num = 300
     date_time_str = time.strftime("%Y-%m-%d-%H-%M-%S")
     # for method in ["bootstrap", "stratified", "random"]:
-    for method in ["guided_8", "stratified_label_4", "random"]:
+    for method in ["guided_4", "stratified_label_4", "random"]:
         method_f = method.replace('_', '@')
         start_exp(f"./result/{method_f}_{date_time_str}.json", method, num)
         print(f"Save to {method_f}_{date_time_str}.json")
