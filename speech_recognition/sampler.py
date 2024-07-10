@@ -262,6 +262,7 @@ class VOiCEGuidedSampler(Sampler):
         def feedback(self, result):
             self.results.append(result)
             self.variance = sum([(x - sum(self.results) / len(self.results)) ** 2 for x in self.results]) / len(self.results)
+            self.mean = sum(self.results) / len(self.results)
         def __len__(self):
             return len(self.keys)
         
@@ -306,3 +307,10 @@ class VOiCEGuidedSampler(Sampler):
     def feedback(self, result):
         self.groups[self.next_group].feedback(result)
         self.weights = [i.variance for i in range(self.n_groups)]
+        
+    def calculate(self):
+        final_acc = 0
+        total_len = len(self.keys)
+        for g in self.groups:
+            final_acc += g.mean * len(g) / total_len
+        return final_acc

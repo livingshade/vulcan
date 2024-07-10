@@ -344,7 +344,56 @@ def profile_pipeline_cached(method: str, sampler: Sampler):
         print(f"Corrected acc: {profile_result['corrected_acc']}")
         
     return profile_result
-      
+
+
+def profile_pipeline_guided_cached(method: str, sampler: Sampler):
+    sampler.init()
+    method = method.split('_')[0]
+    start_time = time.time()
+
+    pipe_args = get_pipeline_args()
+    print(f"Profile args: {pipe_args}")
+
+    cache = load_cache(pipe_args)
+    profile_result = {}
+    audio_sampler = AudioSampler(pipe_args)
+    noise_reduction = NoiseReduction(pipe_args)
+    wave_to_text = WaveToText(pipe_args)
+    decoder = Decoder(pipe_args)
+    ev = WordErrorRate()
+    
+    pipeline = Pipeline(name="speech_recognition", ops=[audio_sampler, noise_reduction, wave_to_text, decoder], evaluator=ev, cache=cache)
+    
+    start_time = time.time()
+
+    accuracy = []
+    
+    print("Init done, taking time: ", time.time() - start_time)
+    
+    total = 6400
+    nsample = total
+        
+    start_time = time.time()
+    for i in range(nsample):
+        filename = sampler.sample(method)
+        result = pipeline.run_cached(filename)
+        sampler.feedback(result)
+        
+        accuracy.append(sampler.calculate())
+
+    print("Profile done, taking time: ", time.time() - start_time)
+    
+    for g in sampler.groups:
+        print(f"Group {g}: len = {len(g)}, var = {g.variance}, mean = {g.mean}, sampled = {len(g.results)}")
+    
+    # profile_result["group_acc"] = [np.mean(group_accuracy[i]) for i in range(16)]
+    # profile_result["group_std"] = [np.std(group_accuracy[i]) for i in range(16)]
+    profile_result['accuracy'] = []
+    profile_result['cummulative_accuracy'] = accuracy
+        
+    return profile_result
+     
+ 
 # use Pipeline to get cache
 def profile_pipeline_normal(sample_method: str):
     pipe_args = get_pipeline_args()
@@ -397,8 +446,8 @@ def start_prepare():
                 torch.cuda.empty_cache()
 
 def start_exp(result_fname, method, num):
-    if method.split("_")[0] not in ["bootstrap", "stratified", "random"]:
-        raise ValueError("Method must be one of 'bootstrap', 'stratified', 'random'")
+    if method.split("_")[0] not in ["bootstrap", "stratified", "random", "guided"]:
+        raise ValueError("Method must be one of 'bootstrap', 'stratified', 'random', 'guided'")
     records = []
     for audio_sr in knobs[0][1]:
         for freq_mask in knobs[1][1]:
@@ -408,7 +457,10 @@ def start_exp(result_fname, method, num):
                 os.environ["model"] = str(model)
                 for i in range(num):
                     sampler = prepare_sampler(method)
-                    result = profile_pipeline_cached(method, sampler)
+                    if method.startswith("guided"):
+                        result = profile_pipeline_guided_cached(method, sampler)
+                    else:
+                        result = profile_pipeline_cached(method, sampler)
                     records.append(dict(
                         idx=i,
                         method=method,
