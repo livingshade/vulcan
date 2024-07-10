@@ -272,11 +272,13 @@ class VOiCEGuidedSampler(Sampler):
         self.n_groups = len(set(list(cluster.values())))
         self.next_group = 0
         self.groups = [
-            self.Group([k for k in self.keys if self.k2g[k] == i]) for i in range(self.n_groups)      
+            self.Group([k for k in self.keys if self.k2g[k] == i].copy()) for i in range(self.n_groups)      
         ]
         self.weights = [i.variance for i in self.groups]
         res = " ".join([str(len(i)) for i in self.groups])
         print(f"Sampler: {res}")
+        for g in self.groups:
+            print(f"Group: {g.keys[0]} {len(g.keys)}")
         
     def init(self):        
         self.next_group = 0
