@@ -305,7 +305,7 @@ class VOiCEGuidedSampler(Sampler):
         
     def feedback(self, result):
         self.groups[self.next_group].feedback(result)
-        self.weights = [i.variance for i in range(self.n_groups)]
+        self.weights = [i.variance for i in self.groups]
         
     def calculate(self):
         final_acc = 0
