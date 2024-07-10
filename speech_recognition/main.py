@@ -8,7 +8,7 @@ import tqdm
 import pandas as pd
 import numpy as np
 from op import AudioSampler, NoiseReduction, WaveToText, Decoder
-from sampler import VOiCERandomSampler, VOiCEBootstrapSampler, VOiCEStratifiedSampler, Sampler
+from sampler import VOiCERandomSampler, VOiCEBootstrapSampler, VOiCEStratifiedSampler, Sampler, VOiCEGuidedSampler
 from pipeline import Evaluator, Pipeline, WordErrorRate, BatchData
 import multiprocessing as mp
 import pickle
@@ -36,7 +36,7 @@ DATA_SET_PATH="/data"
 knobs = [
     ('audio_sample_rate', [14000, 16000]),
     ('frequency_mask_width', [2000]),
-    ('model', ['wav2vec2-large-960h'])
+    ('model', ['wav2vec2-large-960h', 'hubert-xlarge'])
 ]
 
 ref_df = pd.read_csv(DATA_SET_PATH + '/VOiCES_devkit/references/filename_transcripts')
@@ -249,6 +249,11 @@ def prepare_sampler(method: str):
         with open(f"./cache/cluster_label_{k}.json", "r") as f:
             cluster = json.load(f)
         sampler = VOiCEStratifiedSampler(cluster)
+    elif method.startswith("guided"):
+        k = int(method.split('_')[-1])
+        with open(f"./cache/cluster_label_{k}.json", "r") as f:
+            cluster = json.load(f)
+        sampler = VOiCEGuidedSampler(cluster)
     else:
         with open("./cache/cluster_natural.json", "r") as f:
             cluster = json.load(f)
@@ -480,10 +485,10 @@ if __name__ == "__main__":
     #     for i in range(num):
     #         start_exp(f"./result/{method}_{i}.json", method)
     
-    num = 300
+    num = 1
     date_time_str = time.strftime("%Y-%m-%d-%H-%M-%S")
     # for method in ["bootstrap", "stratified", "random"]:
-    for method in ["stratified_label_4", "stratified_label_8", "random"]:
+    for method in ["guided_8", "stratified_label_4", "random"]:
         method_f = method.replace('_', '@')
         start_exp(f"./result/{method_f}_{date_time_str}.json", method, num)
         print(f"Save to {method_f}_{date_time_str}.json")
