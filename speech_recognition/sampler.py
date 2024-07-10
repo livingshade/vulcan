@@ -250,6 +250,7 @@ class VOiCEGuidedSampler(Sampler):
             self.next = 0
             self.results = []
             self.variance = 1
+            self.mean = -1
         def init(self):
             random.shuffle(self.keys)
             self.next = 0
