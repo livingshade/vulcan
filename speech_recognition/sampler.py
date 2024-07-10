@@ -292,6 +292,7 @@ class VOiCEGuidedSampler(Sampler):
         g = self.sample_group()
         key = self.groups[g].sample()
         self.next_group = g
+        print(f"Guided Sample: {g} {key}")
         return key
     
     def sample(self, method):
