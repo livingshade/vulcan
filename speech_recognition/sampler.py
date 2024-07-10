@@ -272,7 +272,7 @@ class VOiCEGuidedSampler(Sampler):
         self.n_groups = len(set(list(cluster.values())))
         self.next_group = 0
         self.groups = [
-            Group(
+            self.Group(
                 [k for k in self.keys if self.k2g[k] == i] for i in range(self.n_groups)
             )
         ]

@@ -476,7 +476,7 @@ def start_exp(result_fname, method, num):
                     ))
                     print(f"Done {i} {audio_sr} {freq_mask} {model} {method}")
     with open(result_fname, 'w') as fp:
-        records = json.dump(records, fp)  
+        records = json.dump(records, fp, indent=2)  
 
 
 if __name__ == "__main__":
