@@ -277,10 +277,8 @@ class VOiCEGuidedSampler(Sampler):
             )
         ]
         self.weights = [i.variance for i in self.groups]
-        res = ""
-        for i in self.group:
-            res = res + " " + str(len(i))
-        print(f"Weighted Sampler: {res}")
+        res = " ".join([len(i) for i in self.groups])
+        print(f"Sampler: {res}")
         
     def init(self):        
         self.next_group = 0
