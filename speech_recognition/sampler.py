@@ -279,7 +279,7 @@ class VOiCEGuidedSampler(Sampler):
         res = " ".join([str(len(i)) for i in self.groups])
         print(f"Sampler: {res}")
         for g in self.groups:
-            print(f"Group: {g.keys[0]} {len(g.keys)}")
+            print(f"    Group: {len(g.keys)}")
         
     def init(self):        
         self.next_group = 0
@@ -295,7 +295,6 @@ class VOiCEGuidedSampler(Sampler):
         g = self.sample_group()
         key = self.groups[g].sample()
         self.next_group = g
-        print(f"Guided Sample: {g} {key}")
         return key
     
     def sample(self, method):
