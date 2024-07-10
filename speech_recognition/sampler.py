@@ -275,7 +275,7 @@ class VOiCEGuidedSampler(Sampler):
             self.Group([k for k in self.keys if self.k2g[k] == i]) for i in range(self.n_groups)      
         ]
         self.weights = [i.variance for i in self.groups]
-        res = " ".join([len(i) for i in self.groups])
+        res = " ".join([str(len(i)) for i in self.groups])
         print(f"Sampler: {res}")
         
     def init(self):        
