@@ -288,15 +288,15 @@ class VOiCEGuidedSampler(Sampler):
         gid = random.choices(population=range(self.n_groups), weights=self.weights, k=1)[0]
         return gid
     
-    def stratified_sample_with_feedback(self):
+    def guided_sample(self):
         g = self.sample_group()
         key = self.groups[g].sample()
         self.next_group = g
         return key
     
     def sample(self, method):
-        if method == "stratified":
-            return self.stratified_sample()
+        if method == "guided":
+            return self.guided_sample()
         else:
             raise Exception(f"Invalid sample method [{method}] for VOiCEStratifiedWeightedSampler")   
         
