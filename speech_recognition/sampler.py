@@ -258,7 +258,7 @@ class VOiCEGuidedSampler(Sampler):
         def sample(self):
             ne = self.next
             self.next = (self.next + 1) % len(self.keys)
-            return ne
+            return self.keys[ne]
         def feedback(self, result):
             self.results.append(result)
             self.variance = sum([(x - sum(self.results) / len(self.results)) ** 2 for x in self.results]) / len(self.results)
