@@ -250,7 +250,7 @@ class VOiCEGuidedSampler(Sampler):
             self.next = 0
             self.results = []
             self.variance = 1
-            self.mean = -1
+            self.mean = 0
         def init(self):
             random.shuffle(self.keys)
             self.next = 0
@@ -262,8 +262,8 @@ class VOiCEGuidedSampler(Sampler):
             return self.keys[ne]
         def feedback(self, result):
             self.results.append(result)
-            self.variance = sum([(x - sum(self.results) / len(self.results)) ** 2 for x in self.results]) / len(self.results)
             self.mean = sum(self.results) / len(self.results)
+            self.variance = 0.5 + sum([(x - self.mean) ** 2 for x in self.results]) / len(self.results)
         def __len__(self):
             return len(self.keys)
         
