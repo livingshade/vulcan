@@ -225,7 +225,7 @@ if __name__ == "__main__":
                 
     date_time = time.strftime("%Y-%m-%d-%H-%M-%S")
     # draw_new(records, f"all_{date_time}")
-    for audio_sr in [16000]:
+    for audio_sr in [14000, 16000]:
         knobs["audio_sr"] = [audio_sr]
         draw_average(records, 95, f"avg_p95_{audio_sr}_{date_time}")
         draw_average(records, 99, f"avg_p99_{audio_sr}_{date_time}")
