@@ -14,17 +14,18 @@ color_map = {
     "stratified_label_8": "green",
     "guided_4": "green",
     "guided_8": "blue",
+    "guided_4_variance": "red",
+    "guided_4_minmax": "blue",
+    "guided_4_sumL1": "green",
 }
 
 knobs = {
-    'audio_sr': [14000, 16000],
+    'audio_sr': [16000],
     'freq_mask': [2000],
     'model': ['wav2vec2-large-960h']
 }
 
-# methods = ["random", "stratified_natural", "stratified_hidden", "stratified_label"]
-# methods = ["random", "stratified_label_4", "stratified_label_8"]
-methods = ["random", "stratified_label_4", "guided_4"]
+methods = ["guided_4_variance", "guided_4_minmax", "guided_4_sumL1"]
 
 # knobs = [
 #     ('audio_sample_rate', [12000, 14000, 16000]),
@@ -129,6 +130,10 @@ def draw_average(records, per, prefix=""):
             "stratified_label_4": [[] for i in range(6400)],
             "stratified_label_8": [[] for i in range(6400)],
             "guided_4": [[] for i in range(6400)],
+            "guided_8": [[] for i in range(6400)],
+            "guided_4_variance": [[] for i in range(6400)],
+            "guided_4_minmax": [[] for i in range(6400)],
+            "guided_4_sumL1": [[] for i in range(6400)],
         }
         # ax = fig.add_subplot()
         for idx, r in enumerate(figures_dict[k]):
@@ -168,7 +173,7 @@ def draw_average(records, per, prefix=""):
         def variance(lst):
             return sum([(x - average(lst))**2 for x in lst]) / len(lst)
         def percentile(lst, p):
-            return lst[int(float(len(lst)) * p / 100.0)]
+            return lst[int(float(len(lst)) * (p / 100.0))]
         
         for method in methods:
             upper_bound = []
@@ -225,7 +230,7 @@ if __name__ == "__main__":
                 
     date_time = time.strftime("%Y-%m-%d-%H-%M-%S")
     # draw_new(records, f"all_{date_time}")
-    for audio_sr in [14000, 16000]:
+    for audio_sr in [16000]:
         knobs["audio_sr"] = [audio_sr]
         draw_average(records, 95, f"avg_p95_{audio_sr}_{date_time}")
         draw_average(records, 99, f"avg_p99_{audio_sr}_{date_time}")

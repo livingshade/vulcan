@@ -34,7 +34,7 @@ DATA_SET_PATH="/data"
 # ]
 
 knobs = [
-    ('audio_sample_rate', [14000, 16000]),
+    ('audio_sample_rate', [16000]),
     ('frequency_mask_width', [2000]),
     ('model', ['wav2vec2-large-960h'])
 ]
@@ -250,10 +250,11 @@ def prepare_sampler(method: str):
             cluster = json.load(f)
         sampler = VOiCEStratifiedSampler(cluster)
     elif method.startswith("guided"):
-        k = int(method.split('_')[-1])
+        k = int(method.split('_')[1])
+        weight_metric = method.split('_')[2]
         with open(f"./cache/cluster_label_{k}.json", "r") as f:
             cluster = json.load(f)
-        sampler = VOiCEGuidedSampler(cluster)
+        sampler = VOiCEGuidedSampler(cluster, weight_metric)
     else:
         with open("./cache/cluster_natural.json", "r") as f:
             cluster = json.load(f)
@@ -488,7 +489,7 @@ if __name__ == "__main__":
     num = 300
     date_time_str = time.strftime("%Y-%m-%d-%H-%M-%S")
     # for method in ["bootstrap", "stratified", "random"]:
-    for method in ["guided_4", "stratified_label_4", "random"]:
+    for method in ["guided_4_variance", "guided_4_minmax", "guided_4_sumL1"]:
         method_f = method.replace('_', '@')
         start_exp(f"./result/{method_f}_{date_time_str}.json", method, num)
         print(f"Save to {method_f}_{date_time_str}.json")

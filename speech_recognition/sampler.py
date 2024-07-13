@@ -1,6 +1,6 @@
 import os
 import random
-
+from math import sqrt
 UNIT_LEN = 1000
 
 class Sampler():
@@ -251,23 +251,33 @@ class VOiCEGuidedSampler(Sampler):
             self.results = []
             self.variance = 1
             self.mean = 0
+            self.sumL1 = 0
+            self.minmax = 0
+            
         def init(self):
             random.shuffle(self.keys)
             self.next = 0
             self.results = []
             self.variance = 1
+            self.sumL1 = 1
+            self.minmax = 1
+            
         def sample(self):
             ne = self.next
             self.next = (self.next + 1) % len(self.keys)
             return self.keys[ne]
+        
         def feedback(self, result):
             self.results.append(result)
             self.mean = sum(self.results) / len(self.results)
             self.variance = 0.5 + sum([(x - self.mean) ** 2 for x in self.results]) / len(self.results)
+            self.sumL1 = 0.5 + sum([abs(x - self.mean) for x in self.results]) / sqrt(len(self.results))
+            self.minmax = 0.5 + (max(self.results) - min(self.results)) / sqrt(len(self.results))
+                    
         def __len__(self):
             return len(self.keys)
         
-    def __init__(self, cluster):
+    def __init__(self, cluster, weight_metric):
         self.keys = list(cluster.keys()).copy()
         self.k2g = cluster.copy()
         self.n_groups = len(set(list(cluster.values())))
@@ -275,7 +285,15 @@ class VOiCEGuidedSampler(Sampler):
         self.groups = [
             self.Group([k for k in self.keys if self.k2g[k] == i].copy()) for i in range(self.n_groups)      
         ]
-        self.weights = [i.variance for i in self.groups]
+        self.weight_metric = weight_metric
+        assert(weight_metric in ["variance", "sumL1", "minmax"])
+        if weight_metric == "variance":
+            self.weights = [i.variance for i in self.groups]
+        elif weight_metric == "sumL1":
+            self.weights = [i.sumL1 for i in self.groups]
+        else:
+            self.weights = [i.minmax for i in self.groups]
+            
         res = " ".join([str(len(i)) for i in self.groups])
         print(f"Sampler: {res}")
         for g in self.groups:
@@ -305,8 +323,15 @@ class VOiCEGuidedSampler(Sampler):
         
     def feedback(self, result):
         self.groups[self.next_group].feedback(result)
-        self.weights = [i.variance for i in self.groups]
-        
+        if self.weight_metric == "variance":
+            self.weights = [i.variance for i in self.groups]
+        elif self.weight_metric == "sumL1":
+            self.weights = [i.sumL1 for i in self.groups]
+        elif self.weight_metric == "minmax":
+            self.weights = [i.minmax for i in self.groups]
+        else:
+            raise Exception(f"Invalid weight metric [{self.weight_metric}]")
+                    
     def calculate(self):
         final_acc = 0
         total_len = len(self.keys)
