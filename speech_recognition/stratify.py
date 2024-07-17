@@ -31,14 +31,14 @@ def kmeans_hidden_stratify():
     X_flattend = X_padded.view(X_padded.size(0), -1)
     # [6400, longest * 29]
     print(X_flattend.shape)
-    K = 16
-    labels, centers = kmeans_sklearn(X_flattend, K)
-    labels = [int(x) for x in labels]
-    dump = dict()
-    for (idx, k) in enumerate(E.keys()):
-        dump.update({k: labels[idx]})
-    with open("./cache/cluster_kmeans.json", "w") as f:
-        json.dump(dump, f)
+    for K in [4, 8, 12, 16]:
+        labels, centers = kmeans_sklearn(X_flattend, K)
+        labels = [int(x) for x in labels]
+        dump = dict()
+        for (idx, k) in enumerate(E.keys()):
+            dump.update({k: labels[idx]})
+        with open(f"./cache/cluster_hidden_{K}.json", "w") as f:
+            json.dump(dump, f)
 
 def label_grouping():
     def kmeans_sklearn(X, K, num_iters=100):
@@ -97,5 +97,6 @@ def natural_stratify():
         json.dump(dump, f)
     
 if __name__ == "__main__":
-    # kmeans_hidden_stratify()
-    label_grouping()
+    kmeans_hidden_stratify()
+    # label_grouping()
+    

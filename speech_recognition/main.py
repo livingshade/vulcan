@@ -27,17 +27,19 @@ DATA_SET_PATH="/data"
 #     ('model', ['wav2vec2-large-10m', 'wav2vec2-large-960h', 'hubert-large', 'hubert-xlarge'])
 # ]
 
-# knobs = [
-#     ('audio_sample_rate', [14000]),
-#     ('frequency_mask_width', [2000]),
-#     ('model', ['wav2vec2-large-10m', 'hubert-large'])
-# ]
 
 knobs = [
-    ('audio_sample_rate', [16000]),
+    ('audio_sample_rate', [14000, 16000]),
     ('frequency_mask_width', [2000]),
-    ('model', ['wav2vec2-large-960h'])
+    ('model', ['wav2vec2-large-960h', 'hubert-large'])
 ]
+
+
+# knobs = [
+#     ('audio_sample_rate', [16000]),
+#     ('frequency_mask_width', [2000]),
+#     ('model', ['wav2vec2-large-960h'])
+# ]
 
 ref_df = pd.read_csv(DATA_SET_PATH + '/VOiCES_devkit/references/filename_transcripts')
 ref_df.set_index('file_name', inplace=True)
@@ -60,6 +62,7 @@ def random_load_speech_data():
     room = random.choice(['rm1', 'rm2', 'rm3', 'rm4'])
     noise = random.choice(['babb', 'musi', 'none', 'tele'])
     path = DATA_SET_PATH + '/VOiCES_devkit/distant-16k/speech/test/' + room + '/' + noise + '/'
+    path = DATA_SET_PATH + '/VOiCES_devkit/distant-16k/speech/test/' + room + '/' + noise + '/'
     sp = random.choice([f for f in os.listdir(path) if f.startswith('sp')])
     path = path + sp + '/'
     filename = random.choice(os.listdir(path))
@@ -76,8 +79,12 @@ def random_load_speech_data():
 def sample_speech_data(sampler: VOiCERandomSampler, method: str):
 
     filename = sampler.sample(method)  
+    rm = filename.split('-')[3]
+    noise = filename.split('-')[4]
+    sp = filename.split('-')[5]
+    full_path = DATA_SET_PATH + "/VOiCES_devkit/distant-16k/speech/test/" + rm + "/" + noise + "/" + sp + "/" + filename
     # /data/VOiCES_devkit/distant-16k/speech/test/rm2/none/sp1898/Lab41-SRI-VOiCES-rm2-none-sp1898-ch145702-sg0011-mc01-stu-clo-dg080.wav
-    audio, sr = librosa.load(filename)
+    audio, sr = librosa.load(full_path)
     
     # Transcription
     transcript = ref_df.loc[filename.split('/')[-1].split('.')[0], 'transcript'] # split to remove .wav
@@ -91,19 +98,23 @@ def profile_pipeline(method:str):
     
     profile_result = {}
     # torch.cuda.reset_peak_memory_stats() 
+    # torch.cuda.reset_peak_memory_stats() 
     audio_sampler = AudioSampler(pipe_args)
     noise_reduction = NoiseReduction(pipe_args)
     wave_to_text = WaveToText(pipe_args)
     
+    
     decoder = Decoder(pipe_args)
 
 
+    print(f"Start {method} profile args: {pipe_args}")
     print(f"Start {method} profile args: {pipe_args}")
     start_time = time.time()
 
     print('profile latency & input size')
     # Profile args:
     num_profile_sample_latency  = 10 #Can't be small because of warm-up
+    
     
     for _ in tqdm.tqdm(range(num_profile_sample_latency)):
         audio, sr, transcript = random_load_speech_data()
@@ -118,7 +129,14 @@ def profile_pipeline(method:str):
         batch_data = wave_to_text.profile(batch_data, profile_compute_latency=True, profile_input_size=True)
         # Reset peak memory stats
 
+        # Reset peak memory stats
+
         batch_data = decoder.profile(batch_data, profile_compute_latency=True, profile_input_size=True)
+    max_memory_allocated = torch.cuda.max_memory_allocated()
+    max_memory_reserved = torch.cuda.max_memory_reserved()
+    # print(f"Maximum memory allocated: {max_memory_allocated / 1024 ** 2} MB")
+    # print(f"Maximum memory reserved: {max_memory_reserved / 1024 ** 2} MB")
+    # exit(0)
     max_memory_allocated = torch.cuda.max_memory_allocated()
     max_memory_reserved = torch.cuda.max_memory_reserved()
     # print(f"Maximum memory allocated: {max_memory_allocated / 1024 ** 2} MB")
@@ -136,10 +154,16 @@ def profile_pipeline(method:str):
 
     print('profile accuracy')
     num_profile_sample = 10 
+    num_profile_sample = 10 
     batch_size = 1 # calculate cummulated accuracy every batch
 
     group_accuracy = [[] for i in range(16)]
+    group_accuracy = [[] for i in range(16)]
     cum_accuracy = []
+    # for i in tqdm.tqdm(range(num_profile_sample)):
+    for i in range(num_profile_sample):
+        audio, sr, transcript, filename = sample_speech_data(sampler, method)
+        # audio, sr, transcript = random_load_speech_data()
     # for i in tqdm.tqdm(range(num_profile_sample)):
     for i in range(num_profile_sample):
         audio, sr, transcript, filename = sample_speech_data(sampler, method)
@@ -156,6 +180,9 @@ def profile_pipeline(method:str):
         batch_data = decoder.profile(batch_data)
         if i % batch_size == 0:
             cum_accuracy.append(decoder.get_endpoint_accuracy())
+        # batch size in decoder is also 1
+        sampler.feedback((filename, decoder.get_last_accuracy()))
+        group_accuracy[i % 16].append(decoder.get_last_accuracy())
         # batch size in decoder is also 1
         sampler.feedback((filename, decoder.get_last_accuracy()))
         group_accuracy[i % 16].append(decoder.get_last_accuracy())
@@ -250,9 +277,11 @@ def prepare_sampler(method: str):
             cluster = json.load(f)
         sampler = VOiCEStratifiedSampler(cluster)
     elif method.startswith("guided"):
-        k = int(method.split('_')[1])
-        weight_metric = method.split('_')[2]
-        with open(f"./cache/cluster_label_{k}.json", "r") as f:
+        m = method.split('_')
+        c = m[1]
+        k = m[2]
+        weight_metric = m[3] if len(m) > 3 else "variance"
+        with open(f"./cache/cluster_{c}_{k}.json", "r") as f:
             cluster = json.load(f)
         sampler = VOiCEGuidedSampler(cluster, weight_metric)
     else:
@@ -414,7 +443,7 @@ def profile_pipeline_normal(sample_method: str):
     ev = WordErrorRate()
     pipeline = Pipeline(name="speech_recognition", ops=[audio_sampler, noise_reduction, wave_to_text, decoder], evaluator=ev, cache=None)
     print(f"Bootrap profile args: {pipe_args}")
-    sampler = VOiCERandomSampler()
+    sampler = prepare_sampler(sample_method)
     
     nsample = 6400
     for _ in range(nsample):
@@ -435,7 +464,9 @@ def profile_pipeline_normal(sample_method: str):
     #     f.write(json.dumps(dump))
     # print(f"Done, saved to {dump_filename}")
     dump = {"args": pipe_args, "results": eval_result}
-    with open("./cache/embedding.pkl", 'wb') as f:
+
+    os.system("mkdir -p ./cache")
+    with open(f"./cache/embedding.pkl", 'wb') as f:
         pickle.dump(dump, f, pickle.HIGHEST_PROTOCOL)
     return 
       
@@ -476,6 +507,7 @@ def start_exp(result_fname, method, num):
                         result=result
                     ))
                     print(f"Done {i} {audio_sr} {freq_mask} {model} {method}")
+    
     with open(result_fname, 'w') as fp:
         records = json.dump(records, fp, indent=2)  
 
@@ -489,8 +521,10 @@ if __name__ == "__main__":
     num = 300
     date_time_str = time.strftime("%Y-%m-%d-%H-%M-%S")
     # for method in ["bootstrap", "stratified", "random"]:
-    for method in ["guided_4_variance", "guided_4_minmax", "guided_4_sumL1"]:
+    # for method in ["guided_label_4_sumL1", "guided_label_4_avgL1", "random"]:
+    for method in ["guided_hidden_4_variance", "guided_hidden_8_variance", "guided_label_4_variance", "random"]:
         method_f = method.replace('_', '@')
+        os.system(f"mkdir -p ./result")
         start_exp(f"./result/{method_f}_{date_time_str}.json", method, num)
         print(f"Save to {method_f}_{date_time_str}.json")
 
