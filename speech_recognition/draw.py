@@ -12,19 +12,21 @@ color_map = {
     "bootstrap": "orange",
     "stratified_label_4": "blue",
     "stratified_label_8": "green",
-    "guided_label_4_variance": "red",
+    "guided_label_4_variance": "orange",
     "guided_label_4_minmax": "blue",
     "guided_label_4_sumL1": "green",
     "guided_label_4_avgL1": "orange",
+    "guided_hidden_4_variance": "green",
+    "guided_hidden_8_variance": "blue",
 }
 
 knobs = {
-    'audio_sr': [16000],
+    'audio_sr': [14000, 16000],
     'freq_mask': [2000],
-    'model': ['wav2vec2-large-960h']
+    'model': ['wav2vec2-large-960h', 'hubert-large']
 }
 
-methods = ["random", "guided_label_4_sumL1", "guided_label_4_avgL1"]
+methods = ["random", "guided_label_4_variance", "guided_hidden_4_variance", "guided_hidden_8_variance"]
 
 # knobs = [
 #     ('audio_sample_rate', [12000, 14000, 16000]),
@@ -132,6 +134,8 @@ def draw_average(records, per, prefix=""):
             "guided_label_4_minmax": [[] for i in range(6400)],
             "guided_label_4_sumL1": [[] for i in range(6400)],
             "guided_label_4_avgL1": [[] for i in range(6400)],
+            "guided_hidden_4_variance": [[] for i in range(6400)],
+            "guided_hidden_8_variance": [[] for i in range(6400)],
         }
         # ax = fig.add_subplot()
         for idx, r in enumerate(figures_dict[k]):
@@ -228,9 +232,9 @@ if __name__ == "__main__":
                 
     date_time = time.strftime("%Y-%m-%d-%H-%M-%S")
     # draw_new(records, f"all_{date_time}")
-    for audio_sr in [16000]:
+    for audio_sr in [14000, 16000]:
         knobs["audio_sr"] = [audio_sr]
         draw_average(records, 95, f"avg_p95_{audio_sr}_{date_time}")
-        # draw_average(records, 99, f"avg_p99_{audio_sr}_{date_time}")
+        draw_average(records, 99, f"avg_p99_{audio_sr}_{date_time}")
 
     # plot_new(records_random[0], f"random_0")
