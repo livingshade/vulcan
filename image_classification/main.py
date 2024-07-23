@@ -17,7 +17,7 @@ import torchvision.datasets as datasets
 import torchvision.models as models
 import torchvision.transforms as transforms
 import torch.nn as nn
-from sampler import StratifiedSampler
+from sampler import StratifiedSampler, RandomSampler
 
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
@@ -38,7 +38,7 @@ parser.add_argument('-b', '--batch-size', default=1, type=int,
                          'using Data Parallel or Distributed Data Parallel')
 parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
-parser.add_argument('-p', '--print-freq', default=10, type=int,
+parser.add_argument('-p', '--print-freq', default=1000, type=int,
                     metavar='N', help='print frequency (default: 10)')
 parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
                     help='evaluate model on validation set', default=True)
@@ -129,16 +129,20 @@ def main_worker(gpu, ngpus_per_node, args):
                 normalize,
             ]))
 
-    cluster = {}
-    for img in val_dataset.imgs:
-        path, label = img
-        path = path.split('/')[-1]
-        cls = val_dataset.classes[label]
-        cluster.update({path: cls})
-    with open('./cache/cluster.json', 'w') as f:
-        json.dump(cluster, f, indent=4)
-    # val_sampler = StratifiedSampler(val_dataset)
-    exit(0)  
+    # cluster = {}
+    # for img in val_dataset.imgs:
+    #     path, label = img
+    #     path = path.split('/')[-1]
+    #     cls = val_dataset.classes[label]
+    #     cluster.update({path: cls})
+    # with open('./cache/cluster.json', 'w') as f:
+    #     json.dump(cluster, f, indent=4)
+    
+    with open('./cache/cluster.json', 'r') as f:
+        cluster = json.load(f)
+        
+    # val_sampler = StratifiedSampler(val_dataset, cluster)
+    val_sampler = RandomSampler(val_dataset)
 
     criterion = nn.CrossEntropyLoss().to(device)
 
@@ -151,11 +155,10 @@ def main_worker(gpu, ngpus_per_node, args):
 
 def validate(val_loader, model, criterion, args):
 
-    def run_validate(loader, base_progress=0):
+    def run_validate(loader, results=None):
         with torch.no_grad():
             end = time.time()
             for i, (images, target) in enumerate(loader):
-                i = base_progress + i
                 if args.gpu is not None and torch.cuda.is_available():
                     images = images.cuda(args.gpu, non_blocking=True)
                 if torch.backends.mps.is_available():
@@ -170,6 +173,7 @@ def validate(val_loader, model, criterion, args):
 
                 # measure accuracy and record loss
                 acc1, acc5 = accuracy(output, target, topk=(1, 5))
+                results.append((acc1.tolist(), acc5.tolist()))
                 losses.update(loss.item(), images.size(0))
                 top1.update(acc1[0], images.size(0))
                 top5.update(acc5[0], images.size(0))
@@ -193,10 +197,26 @@ def validate(val_loader, model, criterion, args):
     # switch to evaluate mode
     model.eval()
 
-    run_validate(val_loader)
+    results = []
 
+    run_validate(val_loader, results)
     progress.display_summary()
 
+    allocate_history = val_loader.sampler.allocate_history
+    assert(len(results) == len(allocate_history))
+    acc1 = [r[0][0] for r in results]
+    acc5 = [r[1][0] for r in results]
+    
+    # cul_acc1 = [sum(acc1[:i+1]) / (i+1) for i in range(len(acc1))]
+    # cul_acc5 = [sum(acc5[:i+1]) / (i+1) for i in range(len(acc5))]
+    
+    dump = {"args": args.arch, "results": {}}
+    for i in range(len(results)):
+        dump["results"].update({allocate_history[i]: {"acc1": acc1[i], "acc5": acc5[i]}})
+    
+    fname = f"{args.arch}.json"
+    with open("./cache/" + fname, "w") as f:
+        json.dump(dump, f, indent=4)
     return top1.avg
 
 
