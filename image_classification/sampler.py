@@ -14,6 +14,10 @@ class RandomSampler(Sampler):
 
         self.allocate_history = []
 
+    def init(self):
+        random.shuffle(self.idx2key)
+        self.allocate_history = []
+
     def __iter__(self):
         for i in range(len(self.idx2key)):
             self.allocate_history.append(self.idx2key[i])
@@ -41,14 +45,15 @@ class StratifiedSampler(Sampler):
             path, _ = sample
             key = path.split('/')[-1]
             self.key2idx[key] = idx
-        
+        self.allocate_history = []
         self.init()
         
     def init(self):
         random.shuffle(self.keys)
         for c in self.class_keys:
             random.shuffle(self.class_keys[c])
-    
+        self.allocate_history = []
+        
     def sample_class(self, w):
         for i in range(len(self.weight)):
             if w < self.weight[i]:
@@ -67,7 +72,7 @@ class StratifiedSampler(Sampler):
                 self.class_idx[cls] = (idx + 1) % len(self.class_keys[cls])
                 
                 key = self.class_keys[cls][idx]
-                
+                self.allocate_history.append(key)
                 yield self.key2idx[key]
 
     def __len__(self):

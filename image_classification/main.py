@@ -49,7 +49,7 @@ parser.add_argument('--seed', default=None, type=int,
 parser.add_argument('--gpu', default=0, type=int,
                     help='GPU id to use.')
 parser.add_argument('--dummy', action='store_true', help="use fake data to benchmark")
-
+parser.add_argument('-m', '--method',  default="random", type=str, help="sampling method")
 best_acc1 = 0
 
 
@@ -140,9 +140,13 @@ def main_worker(gpu, ngpus_per_node, args):
     
     with open('./cache/cluster.json', 'r') as f:
         cluster = json.load(f)
-        
-    # val_sampler = StratifiedSampler(val_dataset, cluster)
-    val_sampler = RandomSampler(val_dataset)
+    
+    if args.method == "random":
+        val_sampler = RandomSampler(val_dataset)
+    elif args.method == "stratified":
+        val_sampler = StratifiedSampler(val_dataset, cluster)
+    else:
+        raise ValueError("Invalid method")
 
     criterion = nn.CrossEntropyLoss().to(device)
 
@@ -151,10 +155,24 @@ def main_worker(gpu, ngpus_per_node, args):
         val_dataset, batch_size=args.batch_size, shuffle=False,
         num_workers=args.workers, pin_memory=True, sampler=val_sampler)
 
-    validate(val_loader, model, criterion, args)
+    if True:
+        date_time_str = time.strftime("%Y-%m-%d-%H-%M-%S")
+        method = args.method
+        arch = args.arch
+        fname = f"{method}_{arch}_{date_time_str}.json"
+        num = 1
+        results = []
+        for _ in range(num):
+            result = validate_cached(val_loader, args, 0)
+            results.append(result)
+        os.system("mkdir -p ./result")
+        with open(f"./result/{fname}.json", "w") as f:
+            json.dump(results, f, indent=4)
+        print(f"Saved to ./result/{fname}")
+    else:
+        validate(val_loader, model, criterion, args)
 
-def validate(val_loader, model, criterion, args):
-
+def validate(val_loader, model, criterion, args):    
     def run_validate(loader, results=None):
         with torch.no_grad():
             end = time.time()
@@ -218,6 +236,32 @@ def validate(val_loader, model, criterion, args):
     with open("./cache/" + fname, "w") as f:
         json.dump(dump, f, indent=4)
     return top1.avg
+
+def validate_cached(val_loader, args, idx):
+    def load_cached(args):
+        with open(f"./cache/{args.arch}.json", "r") as f:
+            cache = json.load(f)
+        return cache
+    sampler = val_loader.sampler
+    cache = load_cached(args)["results"]
+    acc1s = []
+    acc5s = []
+    for _ in sampler:
+        key = sampler.allocate_history[-1]
+        acc1 = cache[key]["acc1"]
+        acc5 = cache[key]["acc5"]
+        acc1s.append(acc1)
+        acc5s.append(acc5)
+    cul_acc1 = [sum(acc1s[:i+1]) / (i+1) for i in range(len(acc1s))]
+    cul_acc5 = [sum(acc5s[:i+1]) / (i+1) for i in range(len(acc5s))]
+    return {
+        "idx": idx,
+        "args": args.arch,
+        "cul_acc1": cul_acc1,
+        "cul_acc5": cul_acc5,
+        "acc1": acc1s,
+        "acc5": acc5s,
+    }
 
 
 def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
