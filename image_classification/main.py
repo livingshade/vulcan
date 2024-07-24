@@ -18,6 +18,7 @@ import torchvision.models as models
 import torchvision.transforms as transforms
 import torch.nn as nn
 from sampler import StratifiedSampler, RandomSampler
+import pickle
 
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
@@ -51,10 +52,10 @@ parser.add_argument('--gpu', default=0, type=int,
 parser.add_argument('--dummy', action='store_true', help="use fake data to benchmark")
 parser.add_argument('-m', '--method',  default="random", type=str, help="sampling method")
 best_acc1 = 0
+parser.add_argument('--num', default=1, type=int, help="number of trials")
+parser.add_argument('--cache', action='store_true', help="cache the result")
 
-
-def main():
-    args = parser.parse_args()
+def main(args):
 
     if args.seed is not None:
         random.seed(args.seed)
@@ -84,9 +85,6 @@ def main():
 def main_worker(gpu, ngpus_per_node, args):
     global best_acc1
     args.gpu = gpu
-
-    if args.gpu is not None:
-        print("Use GPU: {} for training".format(args.gpu))
 
     # create model
     print("=> using pre-trained model '{}'".format(args.arch))
@@ -134,20 +132,23 @@ def main_worker(gpu, ngpus_per_node, args):
     #     path, label = img
     #     path = path.split('/')[-1]
     #     cls = val_dataset.classes[label]
-    #     cluster.update({path: cls})
-    # with open('./cache/cluster.json', 'w') as f:
+    #     cluster.update({path: label})
+    # with open('./cache/cluster_label.json', 'w') as f:
     #     json.dump(cluster, f, indent=4)
-    
-    with open('./cache/cluster.json', 'r') as f:
-        cluster = json.load(f)
+   
+
     
     if args.method == "random":
         val_sampler = RandomSampler(val_dataset)
     elif args.method == "stratified":
+        with open('./cache/cluster_last_16_resnet50.json', 'r') as f:
+            cluster = json.load(f)
         val_sampler = StratifiedSampler(val_dataset, cluster)
     else:
         raise ValueError("Invalid method")
-
+    
+    val_sampler.init()
+    
     criterion = nn.CrossEntropyLoss().to(device)
 
 
@@ -155,12 +156,12 @@ def main_worker(gpu, ngpus_per_node, args):
         val_dataset, batch_size=args.batch_size, shuffle=False,
         num_workers=args.workers, pin_memory=True, sampler=val_sampler)
 
-    if True:
+    if args.cache:
         date_time_str = time.strftime("%Y-%m-%d-%H-%M-%S")
         method = args.method
         arch = args.arch
         fname = f"{method}_{arch}_{date_time_str}.json"
-        num = 1
+        num = args.num
         results = []
         for _ in range(num):
             result = validate_cached(val_loader, args, 0)
@@ -188,10 +189,9 @@ def validate(val_loader, model, criterion, args):
                 # compute output
                 output = model(images)
                 loss = criterion(output, target)
-
                 # measure accuracy and record loss
                 acc1, acc5 = accuracy(output, target, topk=(1, 5))
-                results.append((acc1.tolist(), acc5.tolist()))
+                results.append((acc1.tolist(), acc5.tolist(), output))
                 losses.update(loss.item(), images.size(0))
                 top1.update(acc1[0], images.size(0))
                 top5.update(acc5[0], images.size(0))
@@ -228,13 +228,19 @@ def validate(val_loader, model, criterion, args):
     # cul_acc1 = [sum(acc1[:i+1]) / (i+1) for i in range(len(acc1))]
     # cul_acc5 = [sum(acc5[:i+1]) / (i+1) for i in range(len(acc5))]
     
-    dump = {"args": args.arch, "results": {}}
-    for i in range(len(results)):
-        dump["results"].update({allocate_history[i]: {"acc1": acc1[i], "acc5": acc5[i]}})
+    fname = f"{args.arch}"
+
+    last_hidden_state = [r[2] for r in results]
+    pkl = {allocate_history[i]: last_hidden_state[i] for i in range(len(allocate_history))}
+    with open(f"./cache/{fname}_embedding.pkl", 'wb') as f:
+        pickle.dump(pkl, f, pickle.HIGHEST_PROTOCOL)
     
-    fname = f"{args.arch}.json"
-    with open("./cache/" + fname, "w") as f:
-        json.dump(dump, f, indent=4)
+    # dump = {"args": args.arch, "results": {}}
+    # for i in range(len(results)):
+    #     dump["results"].update({allocate_history[i]: {"acc1": acc1[i], "acc5": acc5[i]}})
+    # with open("./cache/" + fname + ".json", "w") as f:
+    #     json.dump(dump, f, indent=4)
+        
     return top1.avg
 
 def validate_cached(val_loader, args, idx):
@@ -254,6 +260,7 @@ def validate_cached(val_loader, args, idx):
         acc5s.append(acc5)
     cul_acc1 = [sum(acc1s[:i+1]) / (i+1) for i in range(len(acc1s))]
     cul_acc5 = [sum(acc5s[:i+1]) / (i+1) for i in range(len(acc5s))]
+    print(f"cul_acc1: {cul_acc1[-1]}, cul_acc5: {cul_acc5[-1]}")
     return {
         "idx": idx,
         "args": args.arch,
@@ -366,4 +373,18 @@ def accuracy(output, target, topk=(1,)):
 
 
 if __name__ == '__main__':
-    main()
+    args = parser.parse_args()
+
+    #! do exp
+    args.data = "/data/imagenet"
+    args.cache = True
+    args.num = 1
+    # for arch in ["resnet34", "resnet101", "resnet152"]:
+    #     args.arch = arch
+    for method in ["stratified", "random"]:
+        args.method = method
+        main(args)  
+    
+    # #! get hidden state 
+    # args.cache = False
+    # main(args)  
