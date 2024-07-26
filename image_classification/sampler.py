@@ -13,18 +13,18 @@ class RandomSampler(Sampler):
             self.idx2key.append(key)
 
         self.allocate_history = []
-
+        self.keys = list(self.key2idx.keys()).copy()
     def init(self):
-        random.shuffle(self.idx2key)
+        random.shuffle(self.keys)
         self.allocate_history = []
 
     def __iter__(self):
-        for i in range(len(self.idx2key)):
-            self.allocate_history.append(self.idx2key[i])
-            yield i
+        for k in self.keys:
+            self.allocate_history.append(k)
+            yield self.key2idx[k]
             
     def __len__(self):
-        return len(self.idx2key)
+        return len(self.keys)
 
 class StratifiedSampler(Sampler):
     def __init__(self, data_source: datasets.ImageFolder, cluster):

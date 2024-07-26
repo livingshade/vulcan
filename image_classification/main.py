@@ -160,7 +160,7 @@ def main_worker(gpu, ngpus_per_node, args):
         date_time_str = time.strftime("%Y-%m-%d-%H-%M-%S")
         method = args.method
         arch = args.arch
-        fname = f"{method}_{arch}_{date_time_str}.json"
+        fname = f"{method}_{arch}_{date_time_str}"
         num = args.num
         results = []
         for _ in range(num):
@@ -378,12 +378,12 @@ if __name__ == '__main__':
     #! do exp
     args.data = "/data/imagenet"
     args.cache = True
-    args.num = 1
-    # for arch in ["resnet34", "resnet101", "resnet152"]:
-    #     args.arch = arch
-    for method in ["stratified", "random"]:
-        args.method = method
-        main(args)  
+    args.num = 150
+    for arch in ["resnet34", "resnet50", "resnet101"]:
+        args.arch = arch
+        for method in ["stratified", "random"]:
+            args.method = method
+            main(args)  
     
     # #! get hidden state 
     # args.cache = False
