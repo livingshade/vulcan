@@ -5,15 +5,15 @@ import random
 class RandomSampler(Sampler):
     def __init__(self, data_source: datasets.ImageFolder):
         self.key2idx = {}
-        self.idx2key = []
+        self.keys = []
         for idx, sample in enumerate(data_source.samples):
             path, _ = sample
             key = path.split('/')[-1]
             self.key2idx[key] = idx
-            self.idx2key.append(key)
+            self.keys.append(key)
 
         self.allocate_history = []
-        self.keys = list(self.key2idx.keys()).copy()
+        
     def init(self):
         random.shuffle(self.keys)
         self.allocate_history = []

@@ -42,15 +42,16 @@ def draw_average(records, per, prefix=""):
         axs = [axs]
         
     TOTAL = 50000
+    INTERVAL = 100
     for axid, k in enumerate(figures_dict.keys()):
         ax = axs[axid]
         cul_acc1s = {
-            "random": [[] for i in range(TOTAL)],
-            "stratified": [[] for i in range(TOTAL)],
+            "random": [[] for i in range(TOTAL // INTERVAL)],
+            "stratified": [[] for i in range(TOTAL // INTERVAL)],
         }
         cul_acc5s = {
-            "random": [[] for i in range(TOTAL)],
-            "stratified": [[] for i in range(TOTAL)],
+            "random": [[] for i in range(TOTAL // INTERVAL)],
+            "stratified": [[] for i in range(TOTAL // INTERVAL)],
         }
         # ax = fig.add_subplot()
         for idx, r in enumerate(figures_dict[k]):
@@ -62,18 +63,19 @@ def draw_average(records, per, prefix=""):
             cul_acc5 = record['cul_acc5']
 
 
-            xid = range(TOTAL)
+            xid = range(TOTAL // INTERVAL)
             
             for i in range(TOTAL):
-                cul_acc1s[method][i].append(cul_acc1[i])
-                cul_acc5s[method][i].append(cul_acc5[i])
+                if i % INTERVAL == 0:
+                    cul_acc1s[method][i // INTERVAL].append(cul_acc1[i])
+                    cul_acc5s[method][i // INTERVAL].append(cul_acc5[i])
             # ax.plot(xid, cul_acc1[skip:], label=method, color=color_map[method], linewidth=0.1)
                 # print(f"audio_sr: {audio_sr}, freq_mask: {freq_mask}, model: {model}, method: {method}")
             if sample_idx == 0 and method == "random":
                 ax.set_xlabel('# sample')
                 ax.set_ylabel('Accuracy')
                 ax.set_title(f'{model}')
-                ax.set_xticks([i for i in xid if i % 5000 == 0], [str(i) for i in xid if i % 5000 == 0])
+                ax.set_xticks([i for i in xid if i % 10 == 0], [str(i * INTERVAL) for i in xid if i % 10 == 0])
                 ax.set_xlim(0, len(xid) - 1)
                 # plt.axhline(y=ra_acc, color='g', linestyle='dashed', label='acc')
                 ground_truth = cul_acc1[-1]
@@ -97,6 +99,8 @@ def draw_average(records, per, prefix=""):
                 lower_bound.append(percentile(acc, 100 - per))
             ax.plot(xid, lower_bound, color=color_map[method], label=method,linewidth=0.7)
             ax.plot(xid, upper_bound, color=color_map[method],linewidth=0.7)
+            # if method == "random":
+                # print(upper_bound[:3], lower_bound[:3])
         handles, labels = ax.get_legend_handles_labels()
         by_label = dict(zip(labels, handles))
         ax.legend(by_label.values(), by_label.keys(), loc="right")

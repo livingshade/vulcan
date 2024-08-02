@@ -55,7 +55,7 @@ best_acc1 = 0
 parser.add_argument('--num', default=1, type=int, help="number of trials")
 parser.add_argument('--cache', action='store_true', help="cache the result")
 
-def main(args):
+def main(args, date):
 
     if args.seed is not None:
         random.seed(args.seed)
@@ -79,10 +79,10 @@ def main(args):
 
 
     # Simply call main_worker function
-    main_worker(args.gpu, ngpus_per_node, args)
+    main_worker(args.gpu, ngpus_per_node, args, date)
 
 
-def main_worker(gpu, ngpus_per_node, args):
+def main_worker(gpu, ngpus_per_node, args, date):
     global best_acc1
     args.gpu = gpu
 
@@ -91,7 +91,7 @@ def main_worker(gpu, ngpus_per_node, args):
     model = models.__dict__[args.arch](pretrained=True)
 
     if not torch.cuda.is_available():
-        print('using CPU, this will be slow')
+        print('using CPU')
     elif args.gpu is not None and torch.cuda.is_available():
         torch.cuda.set_device(args.gpu)
         model = model.cuda(args.gpu)
@@ -157,7 +157,7 @@ def main_worker(gpu, ngpus_per_node, args):
         num_workers=args.workers, pin_memory=True, sampler=val_sampler)
 
     if args.cache:
-        date_time_str = time.strftime("%Y-%m-%d-%H-%M-%S")
+        date_time_str = date
         method = args.method
         arch = args.arch
         fname = f"{method}_{arch}_{date_time_str}"
@@ -249,6 +249,7 @@ def validate_cached(val_loader, args, idx):
             cache = json.load(f)
         return cache
     sampler = val_loader.sampler
+    sampler.init()
     cache = load_cached(args)["results"]
     acc1s = []
     acc5s = []
@@ -260,14 +261,13 @@ def validate_cached(val_loader, args, idx):
         acc5s.append(acc5)
     cul_acc1 = [sum(acc1s[:i+1]) / (i+1) for i in range(len(acc1s))]
     cul_acc5 = [sum(acc5s[:i+1]) / (i+1) for i in range(len(acc5s))]
-    print(f"cul_acc1: {cul_acc1[-1]}, cul_acc5: {cul_acc5[-1]}")
     return {
         "idx": idx,
         "args": args.arch,
         "cul_acc1": cul_acc1,
         "cul_acc5": cul_acc5,
-        "acc1": acc1s,
-        "acc5": acc5s,
+        # "acc1": acc1s,
+        # "acc5": acc5s,
     }
 
 
@@ -379,11 +379,12 @@ if __name__ == '__main__':
     args.data = "/data/imagenet"
     args.cache = True
     args.num = 150
+    date_time_str = time.strftime("%Y-%m-%d-%H-%M-%S")
     for arch in ["resnet34", "resnet50", "resnet101"]:
         args.arch = arch
-        for method in ["stratified", "random"]:
+        for method in ["random", "stratified"]:
             args.method = method
-            main(args)  
+            main(args, date_time_str)  
     
     # #! get hidden state 
     # args.cache = False
